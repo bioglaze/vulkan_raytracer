@@ -1,2 +1,5 @@
-# vulkan_raytracer
-Vulkan Raytracer
+# Vulkan Raytracer
+
+This codebase will evolve into a hardware-accelerated Vulkan raytracer. Works on Linux and Windows.
+
+Author: [Timo Wirén](http://twiren.kapsi.fi)
