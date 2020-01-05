@@ -2,7 +2,7 @@
 //
 // Author: Timo Wiren
 // License: MIT
-// Modified: 2020-01-04
+// Modified: 2020-01-05
 #include <stdio.h>
 
 #ifdef _MSC_VER
@@ -11,7 +11,7 @@
 #define cassert(c) { if (!(c)) { __builtin_trap(); } }
 #endif
 
-#define VK_CHECK( x ) { VkResult res = (x); assert( res == VK_SUCCESS ); }
+#define VK_CHECK( x ) { VkResult res = (x); cassert( res == VK_SUCCESS ); }
 
 int cstrcmp( const char* str1, const char* str2 )
 {
@@ -24,13 +24,15 @@ int cstrcmp( const char* str1, const char* str2 )
     return *(const unsigned char*)str1 - *(const unsigned char*)str2;
 }
 
-#include "renderer_vulkan.cpp"
 #include "window_xcb.cpp"
+#include "renderer_vulkan.cpp"
 
 int main()
 {
-    aeWindow window = aeCreateWindow( 1280, 720, "Vulkan Raytracer" );
-    aeCreateRenderer();
+    unsigned width = 1280;
+    unsigned height = 720;
+    aeWindow window = aeCreateWindow( width, height, "Vulkan Raytracer" );
+    aeCreateRenderer( width, height, window.connection, window.window );
     
     printf( "hello!\n" );
 
