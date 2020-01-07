@@ -443,7 +443,7 @@ void CreateDevice()
     queueCreateInfo.queueCount = 1;
     queueCreateInfo.pQueuePriorities = &queuePriorities;
 
-    const char* enabledExtensions[] = { VK_KHR_SWAPCHAIN_EXTENSION_NAME, VK_KHR_MULTIVIEW_EXTENSION_NAME, "VK_AMD_shader_info" };
+    const char* enabledExtensions[] = { VK_KHR_SWAPCHAIN_EXTENSION_NAME, VK_NV_RAY_TRACING_EXTENSION_NAME };
 
     vkGetPhysicalDeviceFeatures( gRenderer.physicalDevice, &gRenderer.features );
 
@@ -462,11 +462,7 @@ void CreateDevice()
     deviceCreateInfo.queueCreateInfoCount = 1;
     deviceCreateInfo.pQueueCreateInfos = &queueCreateInfo;
     deviceCreateInfo.pEnabledFeatures = &enabledFeatures;
-#ifdef AE3D_OPENVR
-    deviceCreateInfo.enabledExtensionCount = 2;
-#else
     deviceCreateInfo.enabledExtensionCount = 1;
-#endif
     deviceCreateInfo.ppEnabledExtensionNames = enabledExtensions;
 
     VK_CHECK( vkCreateDevice( gRenderer.physicalDevice, &deviceCreateInfo, nullptr, &gRenderer.device ) );
@@ -488,16 +484,31 @@ void CreateDevice()
     }
 
     cassert( gRenderer.depthFormat != VK_FORMAT_UNDEFINED && "undefined depth format!" );
+
+    VkPhysicalDeviceRayTracingPropertiesNV rtProps{};
+    rtProps.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PROPERTIES_NV;
+    rtProps.maxRecursionDepth = 0;
+
+    VkPhysicalDeviceProperties2 devProps;
+    devProps.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+    devProps.pNext = &rtProps;
+    devProps.properties = {};
+
+    vkGetPhysicalDeviceProperties2( gRenderer.physicalDevice, &devProps );
 }
 
+#ifdef _MSC_VER
+void CreateSwapchain( unsigned& width, unsigned& height, int presentInterval, HWND hwnd )
+
+#else
 void CreateSwapchain( unsigned& width, unsigned& height, int presentInterval, struct xcb_connection_t* connection, unsigned window )
+#endif
 {
 #if VK_USE_PLATFORM_WIN32_KHR
-    (void)window;
     VkWin32SurfaceCreateInfoKHR surfaceCreateInfo = {};
     surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
     surfaceCreateInfo.hinstance = GetModuleHandle( nullptr );
-    surfaceCreateInfo.hwnd = (HWND)connection;
+    surfaceCreateInfo.hwnd = hwnd;
     VkResult err = vkCreateWin32SurfaceKHR( gRenderer.instance, &surfaceCreateInfo, nullptr, &gRenderer.surface );
     cassert( err == VK_SUCCESS );
 #elif VK_USE_PLATFORM_XCB_KHR
@@ -723,11 +734,19 @@ void EndFrame()
     gRenderer.frameIndex = (gRenderer.frameIndex + 1) % gRenderer.swapchainImageCount;
 }
 
+#ifdef _MSC_VER
+void aeCreateRenderer( unsigned& width, unsigned& height, HWND hwnd )
+#else
 void aeCreateRenderer( unsigned& width, unsigned& height, xcb_connection_t* connection, unsigned win )
+#endif
 {
     CreateInstance();
     CreateDevice();
     LoadFunctionPointers();
     CreateCommandBuffers();
+#ifdef _MSC_VER
+    CreateSwapchain( width, height, 1, hwnd );
+#else
     CreateSwapchain( width, height, 1, connection, win );
+#endif
 }

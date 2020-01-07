@@ -24,7 +24,11 @@ int cstrcmp( const char* str1, const char* str2 )
     return *(const unsigned char*)str1 - *(const unsigned char*)str2;
 }
 
+#ifdef _MSC_VER
+#include "window_win32.cpp"
+#else
 #include "window_xcb.cpp"
+#endif
 #include "renderer_vulkan.cpp"
 
 int main()
@@ -32,15 +36,18 @@ int main()
     unsigned width = 1280;
     unsigned height = 720;
     aeWindow window = aeCreateWindow( width, height, "Vulkan Raytracer" );
+#ifdef _MSC_VER
+    aeCreateRenderer( width, height, window.hwnd );
+#else
     aeCreateRenderer( width, height, window.connection, window.window );
-    
+#endif
+
     printf( "hello!\n" );
 
     bool shouldQuit = false;
 
     while (!shouldQuit)
     {
-
         aePumpWindowEvents( window );
 
         bool eventsHandled = false;

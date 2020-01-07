@@ -3,5 +3,6 @@
   <ItemGroup>
     <ClCompile Include="..\vulkan_raytracer.cpp" />
     <ClCompile Include="..\renderer_vulkan.cpp" />
+    <ClCompile Include="..\window_win32.cpp" />
   </ItemGroup>
 </Project>
