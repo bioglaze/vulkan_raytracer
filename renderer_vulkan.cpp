@@ -30,9 +30,9 @@ struct Renderer
     VkCommandPool cmdPool;
     uint32_t currentBuffer = 0;
     unsigned frameIndex = 0;
-};
-
-Renderer gRenderer;
+    int width = 0;
+    int height = 0;
+} gRenderer;
 
 PFN_vkCreateSwapchainKHR createSwapchainKHR;
 PFN_vkGetSwapchainImagesKHR getSwapchainImagesKHR;
@@ -144,7 +144,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL dbgFunc( VkDebugUtilsMessageSeverityFlagBitsEXT m
         }
     }
     
-    //assert( !"Vulkan debug message" );
+    cassert( !"Vulkan debug message" );
 
     return VK_FALSE;
 }
@@ -629,6 +629,9 @@ void CreateSwapchain( unsigned& width, unsigned& height, int presentInterval, st
         height = surfCaps.currentExtent.height;
     }
 
+    gRenderer.width = width;
+    gRenderer.height = height;
+    
     const uint32_t desiredNumberOfSwapchainImages = ((surfCaps.maxImageCount > 0) && (surfCaps.minImageCount + 1 > surfCaps.maxImageCount)) ? surfCaps.maxImageCount : surfCaps.minImageCount + 1;
     
     VkSurfaceTransformFlagsKHR preTransform = (surfCaps.supportedTransforms & VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR) ? VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR : surfCaps.currentTransform;
@@ -688,6 +691,16 @@ void CreateSwapchain( unsigned& width, unsigned& height, int presentInterval, st
         SetImageLayout( gRenderer.swapchainResources[ 0 ].drawCommandBuffer, gRenderer.swapchainResources[ i ].image,
                         VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, 1, 0, 1, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT );
     }
+
+    VK_CHECK( vkEndCommandBuffer( gRenderer.swapchainResources[ 0 ].drawCommandBuffer ) );
+
+    VkSubmitInfo submitInfo = {};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &gRenderer.swapchainResources[ 0 ].drawCommandBuffer;
+
+    VK_CHECK( vkQueueSubmit( gRenderer.graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE ) );
+    VK_CHECK( vkQueueWaitIdle( gRenderer.graphicsQueue ) );
 }
 
 void EndFrame()
@@ -749,4 +762,89 @@ void aeCreateRenderer( unsigned& width, unsigned& height, xcb_connection_t* conn
 #else
     CreateSwapchain( width, height, 1, connection, win );
 #endif
+}
+
+void aeBeginFrame()
+{
+    vkWaitForFences( gRenderer.device, 1, &gRenderer.swapchainResources[ gRenderer.frameIndex ].fence, VK_TRUE, UINT64_MAX );
+    vkResetFences( gRenderer.device, 1, &gRenderer.swapchainResources[ gRenderer.frameIndex ].fence );
+
+    VkResult err = VK_SUCCESS;
+    
+    do
+    {
+        err = acquireNextImageKHR( gRenderer.device, gRenderer.swapchain, UINT64_MAX, gRenderer.swapchainResources[ gRenderer.frameIndex ].imageAcquiredSemaphore, VK_NULL_HANDLE, &gRenderer.currentBuffer );
+        
+        if (err == VK_ERROR_OUT_OF_DATE_KHR)
+        {
+            printf( "Swapchain is out of date!\n" );
+            break;
+            // Handle resizing etc.
+        }
+        else if (err == VK_SUBOPTIMAL_KHR)
+        {
+            printf( "Swapchain is suboptimal!\n" );
+            break;
+        }
+        else
+        {
+            cassert( err == VK_SUCCESS );
+        }
+    } while( err != VK_SUCCESS );
+
+    VkCommandBufferBeginInfo cmdBufInfo = {};
+    cmdBufInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    cmdBufInfo.pNext = nullptr;
+
+    VK_CHECK( vkBeginCommandBuffer( gRenderer.swapchainResources[ gRenderer.currentBuffer ].drawCommandBuffer, &cmdBufInfo ) );
+
+    const VkViewport viewport = { 0, 0, (float)gRenderer.width, (float)gRenderer.height, 0.0f, 1.0f };
+    vkCmdSetViewport( gRenderer.swapchainResources[ gRenderer.currentBuffer ].drawCommandBuffer, 0, 1, &viewport );
+
+    const VkRect2D scissor = { { 0, 0 }, { (uint32_t)gRenderer.width, (uint32_t)gRenderer.height } };
+    vkCmdSetScissor( gRenderer.swapchainResources[ gRenderer.currentBuffer ].drawCommandBuffer, 0, 1, &scissor );
+}
+
+void aeEndFrame()
+{
+    VK_CHECK( vkEndCommandBuffer( gRenderer.swapchainResources[ gRenderer.currentBuffer ].drawCommandBuffer ) );
+
+    VkPipelineStageFlags pipelineStages = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+
+    VkSubmitInfo submitInfo = {};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.pWaitDstStageMask = &pipelineStages;
+    submitInfo.waitSemaphoreCount = 1;
+    submitInfo.pWaitSemaphores = &gRenderer.swapchainResources[ gRenderer.frameIndex ].imageAcquiredSemaphore;
+    submitInfo.signalSemaphoreCount = 1;
+    submitInfo.pSignalSemaphores = &gRenderer.swapchainResources[ gRenderer.frameIndex ].renderCompleteSemaphore;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &gRenderer.swapchainResources[ gRenderer.currentBuffer ].drawCommandBuffer;
+
+    VK_CHECK( vkQueueSubmit( gRenderer.graphicsQueue, 1, &submitInfo, gRenderer.swapchainResources[ gRenderer.frameIndex ].fence ) );
+
+    VkPresentInfoKHR presentInfo = {};
+    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+    presentInfo.swapchainCount = 1;
+    presentInfo.pSwapchains = &gRenderer.swapchain;
+    presentInfo.pImageIndices = &gRenderer.currentBuffer;
+    presentInfo.pWaitSemaphores = &gRenderer.swapchainResources[ gRenderer.frameIndex ].renderCompleteSemaphore;
+    presentInfo.waitSemaphoreCount = 1;
+    VkResult err = queuePresentKHR( gRenderer.graphicsQueue, &presentInfo );
+
+    if (err == VK_ERROR_OUT_OF_DATE_KHR)
+    {
+        printf( "Swapchain is out of date!\n" );
+        // Handle resizing etc.
+    }
+    else if (err == VK_SUBOPTIMAL_KHR)
+    {
+        printf( "Swapchain is suboptimal!\n" );
+    }
+    else
+    {
+        cassert( err == VK_SUCCESS );
+    }
+
+    gRenderer.frameIndex = (gRenderer.frameIndex + 1) % gRenderer.swapchainImageCount;
 }
