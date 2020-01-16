@@ -2,7 +2,7 @@
 //
 // Author: Timo Wiren
 // License: MIT
-// Modified: 2020-01-11
+// Modified: 2020-01-16
 #include <stdio.h>
 
 #ifdef _MSC_VER
@@ -42,8 +42,8 @@ int main()
     aeCreateRenderer( width, height, window.connection, window.window );
 #endif
 
-    printf( "hello!\n" );
-
+    //aeShader shader;
+    
     bool shouldQuit = false;
 
     while (!shouldQuit)
@@ -68,6 +68,8 @@ int main()
         }
 
         aeBeginFrame();
+        aeBeginRenderPass();
+        aeEndRenderPass();
         aeEndFrame();
     }
 }
