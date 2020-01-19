@@ -1,4 +1,5 @@
 #include <vulkan/vulkan.h>
+#include <stdio.h>
 
 struct DepthStencil
 {
@@ -42,6 +43,9 @@ struct Renderer
     unsigned frameIndex = 0;
     int width = 0;
     int height = 0;
+    VkPipelineShaderStageCreateInfo rayHitInfo = {};
+    VkShaderModule rayHitModule = VK_NULL_HANDLE;
+
 } gRenderer;
 
 PFN_vkCreateSwapchainKHR createSwapchainKHR;
@@ -896,6 +900,54 @@ void aeEndRenderPass()
     vkCmdEndRenderPass( gRenderer.swapchainResources[ gRenderer.currentBuffer ].drawCommandBuffer );
 }
 
+struct File
+{
+    unsigned char* data = nullptr;
+    unsigned size = 0;
+};
+
+File LoadFile( const char* path )
+{
+    File outFile;
+    FILE* file = fopen( path, "rb" );
+
+    if (file)
+    {
+        fseek( file, 0, SEEK_END );
+        auto length = ftell( file );
+        fseek( file, 0, SEEK_SET );
+        outFile.data = new unsigned char[ length ];
+        outFile.size = (unsigned)length;
+        fread( outFile.data, 1, length, file );
+        fclose( file );
+    }
+    else
+    {
+        printf( "Could not open file %s\n", path );
+    }
+
+    return outFile;
+}
+
+void LoadShaders()
+{
+    File rayHitFile = LoadFile( "hit.rahit" );
+    
+    VkShaderModuleCreateInfo moduleCreateInfo{};
+    moduleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+    moduleCreateInfo.codeSize = rayHitFile.size;
+    moduleCreateInfo.pCode = (const uint32_t*)rayHitFile.data;
+
+    VkResult err = vkCreateShaderModule( gRenderer.device, &moduleCreateInfo, nullptr, &gRenderer.rayHitModule );
+    cassert( err == VK_SUCCESS );
+    SetObjectName( gRenderer.device, (uint64_t)gRenderer.rayHitModule, VK_OBJECT_TYPE_SHADER_MODULE, "rayHit" );
+
+    /*shaders[ outShader.index ].vertexInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    shaders[ outShader.index ].vertexInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+    shaders[ outShader.index ].vertexInfo.module = shaders[ outShader.index ].vertexShaderModule;
+    shaders[ outShader.index ].vertexInfo.pName = vertexName;*/
+}
+
 #ifdef _MSC_VER
 void aeCreateRenderer( unsigned& width, unsigned& height, HWND hwnd )
 #else
@@ -914,6 +966,7 @@ void aeCreateRenderer( unsigned& width, unsigned& height, xcb_connection_t* conn
     CreateDepthStencil();
     CreateRenderPass();
     CreateFrameBuffer();
+    LoadShaders();
 }
 
 void aeBeginFrame()

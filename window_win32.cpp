@@ -1,7 +1,6 @@
 // This is an independent project of an individual developer. Dear PVS-Studio, please check it.
 // PVS-Studio Static Code Analyzer for C, C++, C#, and Java: http://www.viva64.com
 #include <Windows.h>
-#include <crtdbg.h>
 
 constexpr int EventStackSize = 100;
 
@@ -62,7 +61,7 @@ long GetMilliseconds()
 {
     LARGE_INTEGER li;
     QueryPerformanceCounter( &li );
-    return li.QuadPart / PCFreq;
+    return long( li.QuadPart / PCFreq );
 }
 
 double GetCounter( LONGLONG counterStart )
@@ -193,12 +192,6 @@ static LRESULT CALLBACK WindowProc( HWND hWnd, UINT message, WPARAM wParam, LPAR
 
 aeWindow aeCreateWindow( unsigned width, unsigned height, const char* title )
 {
-#if _DEBUG
-    _CrtSetDbgFlag( _CRTDBG_LEAK_CHECK_DF | _CRTDBG_ALLOC_MEM_DF );
-    _CrtSetReportMode( _CRT_ASSERT, _CRTDBG_MODE_FILE );
-    _CrtSetReportFile( _CRT_ASSERT, _CRTDBG_FILE_STDERR );
-#endif
-
     aeWindow outWindow;
 
     windows[ outWindow.index ].windowWidth = width == 0 ? GetSystemMetrics( SM_CXSCREEN ) : width;
