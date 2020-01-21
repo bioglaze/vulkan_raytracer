@@ -33,7 +33,7 @@ struct Renderer
     VkFormat depthFormat = VK_FORMAT_UNDEFINED;
     VkPhysicalDeviceMemoryProperties deviceMemoryProperties;
     VkDebugUtilsMessengerEXT dbgMessenger = VK_NULL_HANDLE;
-    SwapchainResource swapchainResources[ 3 ] = {};
+    SwapchainResource swapchainResources[ 4 ] = {};
     VkSurfaceKHR surface = VK_NULL_HANDLE;
     VkSwapchainKHR swapchain = VK_NULL_HANDLE;
     uint32_t graphicsQueueNodeIndex = 0;
@@ -392,12 +392,12 @@ void CreateCommandBuffers()
     commandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     commandBufferAllocateInfo.commandPool = gRenderer.cmdPool;
     commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    commandBufferAllocateInfo.commandBufferCount = 3;
+    commandBufferAllocateInfo.commandBufferCount = 4;
 
-    VkCommandBuffer drawCmdBuffers[ 3 ];
+    VkCommandBuffer drawCmdBuffers[ 4 ];
     VK_CHECK( vkAllocateCommandBuffers( gRenderer.device, &commandBufferAllocateInfo, drawCmdBuffers ) );
 
-    for (uint32_t i = 0; i < 3; ++i)
+    for (uint32_t i = 0; i < 4; ++i)
     {
         gRenderer.swapchainResources[ i ].drawCommandBuffer = drawCmdBuffers[ i ];
         const char* name = "drawCommandBuffer 0";
@@ -672,13 +672,13 @@ void CreateSwapchain( unsigned& width, unsigned& height, int presentInterval, st
 
     VK_CHECK( getSwapchainImagesKHR( gRenderer.device, gRenderer.swapchain, &gRenderer.swapchainImageCount, nullptr ) );
 
-    if (gRenderer.swapchainImageCount == 0 || gRenderer.swapchainImageCount > 3)
+    if (gRenderer.swapchainImageCount == 0 || gRenderer.swapchainImageCount > 4)
     {
         printf( "Invalid count of swapchain images!\n ");
         return;
     }
 
-    VkImage images[ 3 ];
+    VkImage images[ 4 ];
     VK_CHECK( getSwapchainImagesKHR( gRenderer.device, gRenderer.swapchain, &gRenderer.swapchainImageCount, images ) );
 
     VkCommandBufferBeginInfo cmdBufInfo = {};
@@ -721,7 +721,7 @@ void CreateDepthStencil()
     image.tiling = VK_IMAGE_TILING_OPTIMAL;
     image.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 
-    for (unsigned i = 0; i < 3; ++i)
+    for (unsigned i = 0; i < 4; ++i)
     {
         VK_CHECK( vkCreateImage( gRenderer.device, &image, nullptr, &gRenderer.swapchainResources[ i ].depthStencil.image ) );
         SetObjectName( gRenderer.device, (uint64_t)gRenderer.swapchainResources[ i ].depthStencil.image, VK_OBJECT_TYPE_IMAGE, "depthstencil" );
@@ -931,7 +931,7 @@ File LoadFile( const char* path )
 
 void LoadShaders()
 {
-    File rayHitFile = LoadFile( "hit.rahit" );
+    File rayHitFile = LoadFile( "rahit.spv" );
     
     VkShaderModuleCreateInfo moduleCreateInfo{};
     moduleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;

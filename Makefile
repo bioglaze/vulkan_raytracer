@@ -4,9 +4,9 @@ DEFINES := -DVK_USE_PLATFORM_XCB_KHR -DSURFACE_EXTENSION_NAME=VK_KHR_XCB_SURFACE
 CC := clang++-8
 SANITIZERS := -g -fsanitize=address,undefined
 
-# SHADER1 := "$(shell glslangValidator -D -V -S vert -e mainVS water.hlsl -o ../build/shader_vs.spv)"
+SHADER1 := "$(shell glslc hit.rahit -o rahit.spv)"
 
 all:
-#	echo $(SHADER1)
+	echo $(SHADER1)
 	$(CC) $(FLAGS) $(DEFINES) $(SANITIZERS) vulkan_raytracer.cpp $(LINKER) -o vulkan_raytracer
 
