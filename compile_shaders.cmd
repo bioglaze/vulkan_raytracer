@@ -1,1 +1,1 @@
-glslc hit.rahit -o hit.spv
+glslc hit.rahit -o rahit.spv

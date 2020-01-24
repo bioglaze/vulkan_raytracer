@@ -20,6 +20,14 @@ struct SwapchainResource
     DepthStencil depthStencil;
 };
 
+struct Raytracer
+{
+	VkBuffer rayGenBindingTable = VK_NULL_HANDLE;
+	VkBuffer rayMissBindingTable = VK_NULL_HANDLE;
+	VkBuffer rayHitBindingTable = VK_NULL_HANDLE;
+	VkBuffer rayCallableBindingTable = VK_NULL_HANDLE;
+};
+
 struct Renderer
 {
     VkDevice device = VK_NULL_HANDLE;
@@ -45,6 +53,7 @@ struct Renderer
     int height = 0;
     VkPipelineShaderStageCreateInfo rayHitInfo = {};
     VkShaderModule rayHitModule = VK_NULL_HANDLE;
+	Raytracer raytracer;
 
 } gRenderer;
 
@@ -59,6 +68,7 @@ PFN_vkQueuePresentKHR queuePresentKHR;
 PFN_vkSetDebugUtilsObjectNameEXT setDebugUtilsObjectNameEXT;
 PFN_vkCmdBeginDebugUtilsLabelEXT CmdBeginDebugUtilsLabelEXT;
 PFN_vkCmdEndDebugUtilsLabelEXT CmdEndDebugUtilsLabelEXT;
+PFN_vkCmdTraceRaysNV CmdTraceRaysNV;
 
 void SetObjectName( VkDevice device, uint64_t object, VkObjectType objectType, const char* name )
 {
@@ -292,8 +302,8 @@ void CreateInstance()
 {
     VkApplicationInfo appInfo = {};
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-    appInfo.pApplicationName = "ExperimentalEngine";
-    appInfo.pEngineName = "ExperimentalEngine";
+    appInfo.pApplicationName = "VulkanRaytracer";
+    appInfo.pEngineName = "VulkanRaytracer";
     appInfo.apiVersion = VK_API_VERSION_1_1;
 
     uint32_t extensionCount = 0;
@@ -377,7 +387,9 @@ void LoadFunctionPointers()
     getSwapchainImagesKHR = (PFN_vkGetSwapchainImagesKHR)vkGetDeviceProcAddr( gRenderer.device, "vkGetSwapchainImagesKHR" );
     acquireNextImageKHR = (PFN_vkAcquireNextImageKHR)vkGetDeviceProcAddr( gRenderer.device, "vkAcquireNextImageKHR" );
     queuePresentKHR = (PFN_vkQueuePresentKHR)vkGetDeviceProcAddr( gRenderer.device, "vkQueuePresentKHR" );
-    setDebugUtilsObjectNameEXT = (PFN_vkSetDebugUtilsObjectNameEXT)vkGetInstanceProcAddr( gRenderer.instance, "vkSetDebugUtilsObjectNameEXT" );
+	setDebugUtilsObjectNameEXT = (PFN_vkSetDebugUtilsObjectNameEXT)vkGetInstanceProcAddr( gRenderer.instance, "vkSetDebugUtilsObjectNameEXT" );
+	CmdTraceRaysNV = (PFN_vkCmdTraceRaysNV)vkGetInstanceProcAddr( gRenderer.instance, "vkCmdTraceRaysNV" );
+	cassert( CmdTraceRaysNV != nullptr );
 }
 
 void CreateCommandBuffers()
@@ -1008,6 +1020,27 @@ void aeBeginFrame()
 
     const VkRect2D scissor = { { 0, 0 }, { (uint32_t)gRenderer.width, (uint32_t)gRenderer.height } };
     vkCmdSetScissor( gRenderer.swapchainResources[ gRenderer.currentBuffer ].drawCommandBuffer, 0, 1, &scissor );
+}
+
+void TraceRays()
+{
+	CmdTraceRaysNV(
+		gRenderer.swapchainResources[ gRenderer.currentBuffer ].drawCommandBuffer,
+		gRenderer.raytracer.rayGenBindingTable,
+		0,
+		gRenderer.raytracer.rayMissBindingTable,
+		0,
+		0,
+		gRenderer.raytracer.rayHitBindingTable,
+		0,
+		0,
+		gRenderer.raytracer.rayCallableBindingTable,
+		0,
+		0,
+		gRenderer.width,
+		gRenderer.height,
+		1
+	);
 }
 
 void aeEndFrame()
