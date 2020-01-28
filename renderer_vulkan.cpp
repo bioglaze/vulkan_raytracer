@@ -54,6 +54,8 @@ struct Renderer
     VkPipelineShaderStageCreateInfo rayHitInfo = {};
     VkShaderModule rayHitModule = VK_NULL_HANDLE;
 	Raytracer raytracer;
+	VkPipeline pso = VK_NULL_HANDLE;
+	VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
 
 } gRenderer;
 
@@ -69,6 +71,7 @@ PFN_vkSetDebugUtilsObjectNameEXT setDebugUtilsObjectNameEXT;
 PFN_vkCmdBeginDebugUtilsLabelEXT CmdBeginDebugUtilsLabelEXT;
 PFN_vkCmdEndDebugUtilsLabelEXT CmdEndDebugUtilsLabelEXT;
 PFN_vkCmdTraceRaysNV CmdTraceRaysNV;
+PFN_vkCreateRayTracingPipelinesNV CreateRayTracingPipelinesNV;
 
 void SetObjectName( VkDevice device, uint64_t object, VkObjectType objectType, const char* name )
 {
@@ -389,6 +392,7 @@ void LoadFunctionPointers()
     queuePresentKHR = (PFN_vkQueuePresentKHR)vkGetDeviceProcAddr( gRenderer.device, "vkQueuePresentKHR" );
 	setDebugUtilsObjectNameEXT = (PFN_vkSetDebugUtilsObjectNameEXT)vkGetInstanceProcAddr( gRenderer.instance, "vkSetDebugUtilsObjectNameEXT" );
 	CmdTraceRaysNV = (PFN_vkCmdTraceRaysNV)vkGetInstanceProcAddr( gRenderer.instance, "vkCmdTraceRaysNV" );
+	CreateRayTracingPipelinesNV = (PFN_vkCreateRayTracingPipelinesNV)vkGetInstanceProcAddr( gRenderer.instance, "vkCreateRayTracingPipelinesNV" );
 	cassert( CmdTraceRaysNV != nullptr );
 }
 
@@ -960,6 +964,45 @@ void LoadShaders()
     shaders[ outShader.index ].vertexInfo.pName = vertexName;*/
 }
 
+void CreatePSO()
+{
+	VkPipelineLayoutCreateInfo createInfo = {};
+	createInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+	createInfo.setLayoutCount = 1;
+	//createInfo.pSetLayouts = &gRenderer.descriptorSetLayout;
+
+	VkPushConstantRange pushConstantRange = {};
+	pushConstantRange.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NV | VK_SHADER_STAGE_ANY_HIT_BIT_NV | VK_SHADER_STAGE_MISS_BIT_NV;
+	pushConstantRange.size = sizeof( int );
+
+	createInfo.pushConstantRangeCount = 1;
+	createInfo.pPushConstantRanges = &pushConstantRange;
+	VK_CHECK( vkCreatePipelineLayout( gRenderer.device, &createInfo, nullptr, &gRenderer.pipelineLayout ) );
+
+	VkPipelineShaderStageCreateInfo stages[ 2 ] = {};
+
+	VkRayTracingPipelineCreateInfoNV info{};
+	info.sType = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_NV;
+	info.pNext = nullptr;
+	info.flags = 0;
+	info.stageCount = 2;
+	info.pStages = stages;
+	info.maxRecursionDepth = 1;
+	info.layout = gRenderer.pipelineLayout;
+	info.basePipelineHandle = VK_NULL_HANDLE;
+	info.basePipelineIndex = 0;
+
+	VK_CHECK( CreateRayTracingPipelinesNV( gRenderer.device, nullptr, 1, &info, nullptr, &gRenderer.pso ) );
+}
+
+void CreateRaytracerResources()
+{
+/*		VkBuffer rayGenBindingTable = VK_NULL_HANDLE;
+		VkBuffer rayMissBindingTable = VK_NULL_HANDLE;
+		VkBuffer rayHitBindingTable = VK_NULL_HANDLE;
+		VkBuffer rayCallableBindingTable = VK_NULL_HANDLE;*/
+}
+
 #ifdef _MSC_VER
 void aeCreateRenderer( unsigned& width, unsigned& height, HWND hwnd )
 #else
@@ -979,6 +1022,8 @@ void aeCreateRenderer( unsigned& width, unsigned& height, xcb_connection_t* conn
     CreateRenderPass();
     CreateFrameBuffer();
     LoadShaders();
+	CreateRaytracerResources();
+	CreatePSO();
 }
 
 void aeBeginFrame()
