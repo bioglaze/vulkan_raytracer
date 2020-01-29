@@ -56,7 +56,7 @@ struct Renderer
 	Raytracer raytracer;
 	VkPipeline pso = VK_NULL_HANDLE;
 	VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
-
+    VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
 } gRenderer;
 
 PFN_vkCreateSwapchainKHR createSwapchainKHR;
@@ -526,6 +526,24 @@ void CreateDevice()
     devProps.properties = {};
 
     vkGetPhysicalDeviceProperties2( gRenderer.physicalDevice, &devProps );
+
+    constexpr unsigned TextureCount = 1;
+    VkDescriptorSetLayoutBinding layoutBindingImage = {};
+    layoutBindingImage.binding = 0;
+    layoutBindingImage.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+    layoutBindingImage.descriptorCount = TextureCount;
+    layoutBindingImage.stageFlags = VK_SHADER_STAGE_ANY_HIT_BIT_NV;
+
+    constexpr unsigned bindingCount = 1;
+    VkDescriptorSetLayoutBinding bindings[ bindingCount ] = { layoutBindingImage };
+        
+    VkDescriptorSetLayoutCreateInfo setCreateInfo = {};
+    setCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    setCreateInfo.bindingCount = bindingCount;
+    setCreateInfo.pBindings = bindings;
+
+    VK_CHECK( vkCreateDescriptorSetLayout( gRenderer.device, &setCreateInfo, nullptr, &gRenderer.descriptorSetLayout ) );
+
 }
 
 #ifdef _MSC_VER
@@ -957,11 +975,6 @@ void LoadShaders()
     VkResult err = vkCreateShaderModule( gRenderer.device, &moduleCreateInfo, nullptr, &gRenderer.rayHitModule );
     cassert( err == VK_SUCCESS );
     SetObjectName( gRenderer.device, (uint64_t)gRenderer.rayHitModule, VK_OBJECT_TYPE_SHADER_MODULE, "rayHit" );
-
-    /*shaders[ outShader.index ].vertexInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    shaders[ outShader.index ].vertexInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-    shaders[ outShader.index ].vertexInfo.module = shaders[ outShader.index ].vertexShaderModule;
-    shaders[ outShader.index ].vertexInfo.pName = vertexName;*/
 }
 
 void CreatePSO()
@@ -969,7 +982,7 @@ void CreatePSO()
 	VkPipelineLayoutCreateInfo createInfo = {};
 	createInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	createInfo.setLayoutCount = 1;
-	//createInfo.pSetLayouts = &gRenderer.descriptorSetLayout;
+	createInfo.pSetLayouts = &gRenderer.descriptorSetLayout;
 
 	VkPushConstantRange pushConstantRange = {};
 	pushConstantRange.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NV | VK_SHADER_STAGE_ANY_HIT_BIT_NV | VK_SHADER_STAGE_MISS_BIT_NV;
@@ -979,13 +992,18 @@ void CreatePSO()
 	createInfo.pPushConstantRanges = &pushConstantRange;
 	VK_CHECK( vkCreatePipelineLayout( gRenderer.device, &createInfo, nullptr, &gRenderer.pipelineLayout ) );
 
-	VkPipelineShaderStageCreateInfo stages[ 2 ] = {};
-
+    constexpr unsigned StageCount = 2;
+	VkPipelineShaderStageCreateInfo stages[ StageCount ] = {};
+    stages[ 0 ].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    stages[ 0 ].stage = VK_SHADER_STAGE_RAYGEN_BIT_NV;
+    stages[ 0 ].module = gRenderer.rayHitModule;
+    stages[ 0 ].pName = "main";
+        
 	VkRayTracingPipelineCreateInfoNV info{};
 	info.sType = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_NV;
 	info.pNext = nullptr;
 	info.flags = 0;
-	info.stageCount = 2;
+	info.stageCount = StageCount;
 	info.pStages = stages;
 	info.maxRecursionDepth = 1;
 	info.layout = gRenderer.pipelineLayout;
