@@ -53,8 +53,12 @@ struct Renderer
     int height = 0;
     VkPipelineShaderStageCreateInfo rayHitInfo = {};
     VkShaderModule rayHitModule = VK_NULL_HANDLE;
+    VkShaderModule rayGenModule = VK_NULL_HANDLE;
+    VkShaderModule rayMissModule = VK_NULL_HANDLE;
 	Raytracer raytracer;
-	VkPipeline pso = VK_NULL_HANDLE;
+	VkPipeline psoRayHit = VK_NULL_HANDLE;
+	VkPipeline psoRayGen = VK_NULL_HANDLE;
+	VkPipeline psoRayMiss = VK_NULL_HANDLE;
 	VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
     VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
 } gRenderer;
@@ -965,16 +969,30 @@ File LoadFile( const char* path )
 
 void LoadShaders()
 {
-    File rayHitFile = LoadFile( "rahit.spv" );
+    {
+        File rayHitFile = LoadFile( "rahit.spv" );
     
-    VkShaderModuleCreateInfo moduleCreateInfo{};
-    moduleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    moduleCreateInfo.codeSize = rayHitFile.size;
-    moduleCreateInfo.pCode = (const uint32_t*)rayHitFile.data;
+        VkShaderModuleCreateInfo moduleCreateInfo{};
+        moduleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+        moduleCreateInfo.codeSize = rayHitFile.size;
+        moduleCreateInfo.pCode = (const uint32_t*)rayHitFile.data;
 
-    VkResult err = vkCreateShaderModule( gRenderer.device, &moduleCreateInfo, nullptr, &gRenderer.rayHitModule );
-    cassert( err == VK_SUCCESS );
-    SetObjectName( gRenderer.device, (uint64_t)gRenderer.rayHitModule, VK_OBJECT_TYPE_SHADER_MODULE, "rayHit" );
+        VkResult err = vkCreateShaderModule( gRenderer.device, &moduleCreateInfo, nullptr, &gRenderer.rayHitModule );
+        cassert( err == VK_SUCCESS );
+        SetObjectName( gRenderer.device, (uint64_t)gRenderer.rayHitModule, VK_OBJECT_TYPE_SHADER_MODULE, "rayHit" );
+    }
+    {
+        File rayMissFile = LoadFile( "ramiss.spv" );
+    
+        VkShaderModuleCreateInfo moduleCreateInfo{};
+        moduleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+        moduleCreateInfo.codeSize = rayMissFile.size;
+        moduleCreateInfo.pCode = (const uint32_t*)rayMissFile.data;
+
+        VkResult err = vkCreateShaderModule( gRenderer.device, &moduleCreateInfo, nullptr, &gRenderer.rayMissModule );
+        cassert( err == VK_SUCCESS );
+        SetObjectName( gRenderer.device, (uint64_t)gRenderer.rayMissModule, VK_OBJECT_TYPE_SHADER_MODULE, "rayMiss" );
+    }
 }
 
 void CreatePSO()
@@ -985,17 +1003,17 @@ void CreatePSO()
 	createInfo.pSetLayouts = &gRenderer.descriptorSetLayout;
 
 	VkPushConstantRange pushConstantRange = {};
-	pushConstantRange.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NV | VK_SHADER_STAGE_ANY_HIT_BIT_NV | VK_SHADER_STAGE_MISS_BIT_NV;
+	pushConstantRange.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NV | VK_SHADER_STAGE_ANY_HIT_BIT_NV | VK_SHADER_STAGE_MISS_BIT_NV | VK_SHADER_STAGE_CLOSEST_HIT_BIT_NV;
 	pushConstantRange.size = sizeof( int );
 
 	createInfo.pushConstantRangeCount = 1;
 	createInfo.pPushConstantRanges = &pushConstantRange;
 	VK_CHECK( vkCreatePipelineLayout( gRenderer.device, &createInfo, nullptr, &gRenderer.pipelineLayout ) );
 
-    constexpr unsigned StageCount = 2;
+    constexpr unsigned StageCount = 1;
 	VkPipelineShaderStageCreateInfo stages[ StageCount ] = {};
     stages[ 0 ].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    stages[ 0 ].stage = VK_SHADER_STAGE_RAYGEN_BIT_NV;
+    stages[ 0 ].stage = VK_SHADER_STAGE_CLOSEST_HIT_BIT_NV;
     stages[ 0 ].module = gRenderer.rayHitModule;
     stages[ 0 ].pName = "main";
         
@@ -1010,7 +1028,7 @@ void CreatePSO()
 	info.basePipelineHandle = VK_NULL_HANDLE;
 	info.basePipelineIndex = 0;
 
-	VK_CHECK( CreateRayTracingPipelinesNV( gRenderer.device, nullptr, 1, &info, nullptr, &gRenderer.pso ) );
+	VK_CHECK( CreateRayTracingPipelinesNV( gRenderer.device, nullptr, 1, &info, nullptr, &gRenderer.psoRayHit ) );
 }
 
 void CreateRaytracerResources()
