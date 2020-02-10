@@ -193,6 +193,7 @@ static LRESULT CALLBACK WindowProc( HWND hWnd, UINT message, WPARAM wParam, LPAR
 aeWindow aeCreateWindow( unsigned width, unsigned height, const char* title )
 {
     aeWindow outWindow;
+	outWindow.index = 0;
 
     windows[ outWindow.index ].windowWidth = width == 0 ? GetSystemMetrics( SM_CXSCREEN ) : width;
     windows[ outWindow.index ].windowHeight = height == 0 ? GetSystemMetrics( SM_CYSCREEN ) : height;
