@@ -6,6 +6,5 @@ layout(location = 0) rayPayloadInNV vec3 outColor;
 
 void main()
 {
-    const vec3 barycentrics = vec3( 0, 0, 0 );//)vec3( 1.0f - hitAttribs.x - hitAttribs.y, hitAttribs.x, hitAttribs.y );
-    outColor = vec3( barycentrics );
+    outColor = vec3( 0.0f, 0.0f, 0.5f );
 }

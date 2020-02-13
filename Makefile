@@ -9,6 +9,5 @@ SHADER2 := "$(shell glslangValidator -V -S rchit hit.glsl -o rahit.spv)"
 SHADER3 := "$(shell glslangValidator -V -S rmiss miss.glsl -o ramiss.spv)"
 
 all:
-#	echo $(SHADER1)
 	$(CC) $(FLAGS) $(DEFINES) $(SANITIZERS) vulkan_raytracer.cpp $(LINKER) -o vulkan_raytracer
 
