@@ -23,9 +23,13 @@ struct SwapchainResource
 struct Raytracer
 {
 	VkBuffer rayGenBindingTable = VK_NULL_HANDLE;
+    VkDeviceMemory rayGenBindingMemory = VK_NULL_HANDLE;
 	VkBuffer rayMissBindingTable = VK_NULL_HANDLE;
+    VkDeviceMemory rayMissBindingMemory = VK_NULL_HANDLE;
 	VkBuffer rayHitBindingTable = VK_NULL_HANDLE;
+    VkDeviceMemory rayHitBindingMemory = VK_NULL_HANDLE;
 	VkBuffer rayCallableBindingTable = VK_NULL_HANDLE;
+    VkDeviceMemory rayCallableBindingMemory = VK_NULL_HANDLE;
 };
 
 struct ShaderBindingTable
@@ -1069,8 +1073,30 @@ void CreatePSO()
 
 void CreateRaytracerResources()
 {
-/*		VkBuffer rayGenBindingTable = VK_NULL_HANDLE;
-		VkBuffer rayMissBindingTable = VK_NULL_HANDLE;
+    unsigned numberOfGroups = 666; // FIXME: Fill this
+    unsigned sizeOfGroup = 32; // FIXME: Fill this
+    
+    VkBuffer rayGenBindingTable{ VK_NULL_HANDLE };
+    VkBufferCreateInfo bufferInfo = {};
+    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.size = numberOfGroups * sizeOfGroup;
+    bufferInfo.usage = 0;
+    VK_CHECK( vkCreateBuffer( gRenderer.device, &bufferInfo, nullptr, &rayGenBindingTable ) );
+    SetObjectName( gRenderer.device, (uint64_t)rayGenBindingTable, VK_OBJECT_TYPE_BUFFER, "rayGenBindingTable" );
+
+    VkMemoryRequirements memReqs;
+    vkGetBufferMemoryRequirements( gRenderer.device, rayGenBindingTable, &memReqs );
+    
+    VkMemoryAllocateInfo memAlloc = {};
+    memAlloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    memAlloc.allocationSize = memReqs.size;
+    memAlloc.memoryTypeIndex = GetMemoryType( memReqs.memoryTypeBits, gRenderer.deviceMemoryProperties, memoryFlags );
+    VK_CHECK( vkAllocateMemory( gRenderer.device, &memAlloc, nullptr, &gRenderer.raytracer.rayGenBindingMemory ) );
+    SetObjectName( gRenderer.device, (uint64_t)gRenderer.raytracer.rayGenBindingMemory, VK_OBJECT_TYPE_DEVICE_MEMORY, "rayGenBindingTable" );
+
+    VK_CHECK( vkBindBufferMemory( gRenderer.device, rayGenBindingTable, gRenderer.raytracer.rayGenBindingMemory, 0 ) );
+
+		/*VkBuffer rayMissBindingTable = VK_NULL_HANDLE;
 		VkBuffer rayHitBindingTable = VK_NULL_HANDLE;
 		VkBuffer rayCallableBindingTable = VK_NULL_HANDLE;*/
 }
