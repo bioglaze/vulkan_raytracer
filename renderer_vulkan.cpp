@@ -1071,34 +1071,37 @@ void CreatePSO()
 	VK_CHECK( CreateRayTracingPipelinesNV( gRenderer.device, nullptr, 1, &info, nullptr, &gRenderer.psoRayHit ) );
 }
 
+void CreateBuffer( VkBuffer& outBuffer, VkDeviceMemory& outMemory, unsigned size, const char* debugName )
+{
+    VkBufferCreateInfo bufferInfo = {};
+    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.size = size;
+    bufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+    VK_CHECK( vkCreateBuffer( gRenderer.device, &bufferInfo, nullptr, &outBuffer ) );
+    SetObjectName( gRenderer.device, (uint64_t)outBuffer, VK_OBJECT_TYPE_BUFFER, debugName );
+
+    VkMemoryRequirements memReqs;
+    vkGetBufferMemoryRequirements( gRenderer.device, outBuffer, &memReqs );
+    
+    VkMemoryAllocateInfo memAlloc = {};
+    memAlloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    memAlloc.allocationSize = memReqs.size;
+    memAlloc.memoryTypeIndex = GetMemoryType( memReqs.memoryTypeBits, gRenderer.deviceMemoryProperties, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
+    VK_CHECK( vkAllocateMemory( gRenderer.device, &memAlloc, nullptr, &outMemory ) );
+    SetObjectName( gRenderer.device, (uint64_t)outMemory, VK_OBJECT_TYPE_DEVICE_MEMORY, debugName );
+
+    VK_CHECK( vkBindBufferMemory( gRenderer.device, outBuffer, outMemory, 0 ) );
+
+}
 void CreateRaytracerResources()
 {
     unsigned numberOfGroups = 666; // FIXME: Fill this
     unsigned sizeOfGroup = 32; // FIXME: Fill this
     
-    VkBuffer rayGenBindingTable{ VK_NULL_HANDLE };
-    VkBufferCreateInfo bufferInfo = {};
-    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    bufferInfo.size = numberOfGroups * sizeOfGroup;
-    bufferInfo.usage = 0;
-    VK_CHECK( vkCreateBuffer( gRenderer.device, &bufferInfo, nullptr, &rayGenBindingTable ) );
-    SetObjectName( gRenderer.device, (uint64_t)rayGenBindingTable, VK_OBJECT_TYPE_BUFFER, "rayGenBindingTable" );
-
-    VkMemoryRequirements memReqs;
-    vkGetBufferMemoryRequirements( gRenderer.device, rayGenBindingTable, &memReqs );
-    
-    VkMemoryAllocateInfo memAlloc = {};
-    memAlloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    memAlloc.allocationSize = memReqs.size;
-    memAlloc.memoryTypeIndex = GetMemoryType( memReqs.memoryTypeBits, gRenderer.deviceMemoryProperties, memoryFlags );
-    VK_CHECK( vkAllocateMemory( gRenderer.device, &memAlloc, nullptr, &gRenderer.raytracer.rayGenBindingMemory ) );
-    SetObjectName( gRenderer.device, (uint64_t)gRenderer.raytracer.rayGenBindingMemory, VK_OBJECT_TYPE_DEVICE_MEMORY, "rayGenBindingTable" );
-
-    VK_CHECK( vkBindBufferMemory( gRenderer.device, rayGenBindingTable, gRenderer.raytracer.rayGenBindingMemory, 0 ) );
-
-		/*VkBuffer rayMissBindingTable = VK_NULL_HANDLE;
-		VkBuffer rayHitBindingTable = VK_NULL_HANDLE;
-		VkBuffer rayCallableBindingTable = VK_NULL_HANDLE;*/
+    CreateBuffer( gRenderer.raytracer.rayGenBindingTable, gRenderer.raytracer.rayGenBindingMemory, numberOfGroups * sizeOfGroup, "rayGenBindingTable" );
+    CreateBuffer( gRenderer.raytracer.rayMissBindingTable, gRenderer.raytracer.rayMissBindingMemory, numberOfGroups * sizeOfGroup, "rayMissBindingTable" );
+    CreateBuffer( gRenderer.raytracer.rayHitBindingTable, gRenderer.raytracer.rayHitBindingMemory, numberOfGroups * sizeOfGroup, "rayHitBindingTable" );
+    CreateBuffer( gRenderer.raytracer.rayCallableBindingTable, gRenderer.raytracer.rayCallableBindingMemory, numberOfGroups * sizeOfGroup, "rayCallableBindingTable" );
 }
 
 #ifdef _MSC_VER
