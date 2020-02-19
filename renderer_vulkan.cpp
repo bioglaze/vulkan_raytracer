@@ -440,6 +440,10 @@ void CreateCommandBuffers()
         {
             name = "drawCommandBuffer 2";
         }
+        else if (i == 3)
+        {
+            name = "drawCommandBuffer 3";
+        }
         
         SetObjectName( gRenderer.device, (uint64_t)drawCmdBuffers[ i ], VK_OBJECT_TYPE_COMMAND_BUFFER, name );
             
