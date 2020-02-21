@@ -343,13 +343,14 @@ void CreateInstance()
     {
         VK_KHR_SURFACE_EXTENSION_NAME,
         SURFACE_EXTENSION_NAME,
+		VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
         VK_EXT_DEBUG_UTILS_EXTENSION_NAME
     };
 
     VkInstanceCreateInfo instanceCreateInfo = {};
     instanceCreateInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     instanceCreateInfo.pApplicationInfo = &appInfo;
-    instanceCreateInfo.enabledExtensionCount = hasDebugUtils ? 3 : 2;
+    instanceCreateInfo.enabledExtensionCount = hasDebugUtils ? 4 : 3;
     instanceCreateInfo.ppEnabledExtensionNames = enabledExtensions;
 #if _DEBUG
     const char* validationLayerNames[] = { "VK_LAYER_KHRONOS_validation" };
@@ -409,6 +410,7 @@ void LoadFunctionPointers()
 	CmdTraceRaysNV = (PFN_vkCmdTraceRaysNV)vkGetInstanceProcAddr( gRenderer.instance, "vkCmdTraceRaysNV" );
 	CreateRayTracingPipelinesNV = (PFN_vkCreateRayTracingPipelinesNV)vkGetInstanceProcAddr( gRenderer.instance, "vkCreateRayTracingPipelinesNV" );
 	cassert( CmdTraceRaysNV != nullptr );
+	cassert( CreateRayTracingPipelinesNV != nullptr );
 }
 
 void CreateCommandBuffers()
@@ -1030,33 +1032,35 @@ void CreatePSO()
 	createInfo.pSetLayouts = &gRenderer.descriptorSetLayout;
 
 	VkPushConstantRange pushConstantRange = {};
-	pushConstantRange.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NV | VK_SHADER_STAGE_MISS_BIT_NV | VK_SHADER_STAGE_CLOSEST_HIT_BIT_NV;
+	pushConstantRange.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NV;
 	pushConstantRange.size = sizeof( int );
 
 	createInfo.pushConstantRangeCount = 1;
 	createInfo.pPushConstantRanges = &pushConstantRange;
 	VK_CHECK( vkCreatePipelineLayout( gRenderer.device, &createInfo, nullptr, &gRenderer.pipelineLayout ) );
 
-    constexpr unsigned StageCount = 3;
+    constexpr unsigned StageCount = 1;
 	VkPipelineShaderStageCreateInfo stages[ StageCount ] = {};
-    stages[ 0 ].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+
+	stages[ 0 ].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	stages[ 0 ].stage = VK_SHADER_STAGE_RAYGEN_BIT_NV;
+	stages[ 0 ].module = gRenderer.rayGenModule;
+	stages[ 0 ].pName = "main";
+
+	/*stages[ 0 ].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     stages[ 0 ].stage = VK_SHADER_STAGE_CLOSEST_HIT_BIT_NV;
     stages[ 0 ].module = gRenderer.rayHitModule;
     stages[ 0 ].pName = "main";
 
-	stages[ 1 ].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	stages[ 1 ].stage = VK_SHADER_STAGE_RAYGEN_BIT_NV;
-	stages[ 1 ].module = gRenderer.rayGenModule;
-	stages[ 1 ].pName = "main";
-
 	stages[ 2 ].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 	stages[ 2 ].stage = VK_SHADER_STAGE_MISS_BIT_NV;
 	stages[ 2 ].module = gRenderer.rayMissModule;
-	stages[ 2 ].pName = "main";
+	stages[ 2 ].pName = "main";*/
 
+	gRenderer.sbt.groups[ 0 ].type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_NV;
 	gRenderer.sbt.groups[ 0 ].anyHitShader = VK_SHADER_UNUSED_NV;
-	gRenderer.sbt.groups[ 0 ].closestHitShader = 0;
-	gRenderer.sbt.groups[ 0 ].generalShader = 1;
+	gRenderer.sbt.groups[ 0 ].closestHitShader = VK_SHADER_UNUSED_NV;
+	gRenderer.sbt.groups[ 0 ].generalShader = 0;
 	gRenderer.sbt.groups[ 0 ].intersectionShader = VK_SHADER_UNUSED_NV;
 
 	VkRayTracingPipelineCreateInfoNV info{};
@@ -1072,7 +1076,7 @@ void CreatePSO()
 	info.groupCount = gRenderer.sbt.groupCount;
 	info.pGroups = gRenderer.sbt.groups;
 
-	VK_CHECK( CreateRayTracingPipelinesNV( gRenderer.device, nullptr, 1, &info, nullptr, &gRenderer.psoRayHit ) );
+	VK_CHECK( CreateRayTracingPipelinesNV( gRenderer.device, nullptr, 1, &info, nullptr, &gRenderer.psoRayGen ) );
 }
 
 void CreateBuffer( VkBuffer& outBuffer, VkDeviceMemory& outMemory, unsigned size, const char* debugName )
