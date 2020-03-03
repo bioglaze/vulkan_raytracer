@@ -68,9 +68,9 @@ int main()
         }
 
         aeBeginFrame();
-        aeBeginRenderPass();
+        //aeBeginRenderPass();
 		TraceRays();
-        aeEndRenderPass();
+        //aeEndRenderPass();
         aeEndFrame();
     }
 }

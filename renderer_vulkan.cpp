@@ -89,6 +89,8 @@ PFN_vkCmdBeginDebugUtilsLabelEXT CmdBeginDebugUtilsLabelEXT;
 PFN_vkCmdEndDebugUtilsLabelEXT CmdEndDebugUtilsLabelEXT;
 PFN_vkCmdTraceRaysNV CmdTraceRaysNV;
 PFN_vkCreateRayTracingPipelinesNV CreateRayTracingPipelinesNV;
+PFN_vkCmdBuildAccelerationStructureNV CmdBuildAccelerationStructureNV;
+PFN_vkCreateAccelerationStructureNV CreateAccelerationStructureNV;
 
 void SetObjectName( VkDevice device, uint64_t object, VkObjectType objectType, const char* name )
 {
@@ -409,10 +411,14 @@ void LoadFunctionPointers()
     acquireNextImageKHR = (PFN_vkAcquireNextImageKHR)vkGetDeviceProcAddr( gRenderer.device, "vkAcquireNextImageKHR" );
     queuePresentKHR = (PFN_vkQueuePresentKHR)vkGetDeviceProcAddr( gRenderer.device, "vkQueuePresentKHR" );
 	setDebugUtilsObjectNameEXT = (PFN_vkSetDebugUtilsObjectNameEXT)vkGetInstanceProcAddr( gRenderer.instance, "vkSetDebugUtilsObjectNameEXT" );
-	CmdTraceRaysNV = (PFN_vkCmdTraceRaysNV)vkGetInstanceProcAddr( gRenderer.instance, "vkCmdTraceRaysNV" );
-	CreateRayTracingPipelinesNV = (PFN_vkCreateRayTracingPipelinesNV)vkGetInstanceProcAddr( gRenderer.instance, "vkCreateRayTracingPipelinesNV" );
+	CmdTraceRaysNV = (PFN_vkCmdTraceRaysNV)vkGetDeviceProcAddr( gRenderer.device, "vkCmdTraceRaysNV" );
+	CreateRayTracingPipelinesNV = (PFN_vkCreateRayTracingPipelinesNV)vkGetDeviceProcAddr( gRenderer.device, "vkCreateRayTracingPipelinesNV" );
+	CmdBuildAccelerationStructureNV = (PFN_vkCmdBuildAccelerationStructureNV)vkGetDeviceProcAddr( gRenderer.device, "vkCmdBuildAccelerationStructureNV" );
+	CreateAccelerationStructureNV = (PFN_vkCreateAccelerationStructureNV)vkGetDeviceProcAddr( gRenderer.device, "vkCreateAccelerationStructureNV" );
 	cassert( CmdTraceRaysNV != nullptr );
 	cassert( CreateRayTracingPipelinesNV != nullptr );
+	cassert( CmdBuildAccelerationStructureNV != nullptr );
+	cassert( CreateAccelerationStructureNV != nullptr );
 }
 
 void CreateCommandBuffers()
@@ -516,7 +522,7 @@ void CreateDevice()
     deviceCreateInfo.queueCreateInfoCount = 1;
     deviceCreateInfo.pQueueCreateInfos = &queueCreateInfo;
     deviceCreateInfo.pEnabledFeatures = &enabledFeatures;
-    deviceCreateInfo.enabledExtensionCount = 1;
+    deviceCreateInfo.enabledExtensionCount = 2;
     deviceCreateInfo.ppEnabledExtensionNames = enabledExtensions;
 
     VK_CHECK( vkCreateDevice( gRenderer.physicalDevice, &deviceCreateInfo, nullptr, &gRenderer.device ) );
@@ -1059,6 +1065,7 @@ void CreatePSO()
 	stages[ 2 ].module = gRenderer.rayMissModule;
 	stages[ 2 ].pName = "main";*/
 
+	gRenderer.sbt.groups[ 0 ].sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_NV;
 	gRenderer.sbt.groups[ 0 ].type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_NV;
 	gRenderer.sbt.groups[ 0 ].anyHitShader = VK_SHADER_UNUSED_NV;
 	gRenderer.sbt.groups[ 0 ].closestHitShader = VK_SHADER_UNUSED_NV;
@@ -1180,6 +1187,8 @@ void aeBeginFrame()
 
 void TraceRays()
 {
+	vkCmdBindPipeline( gRenderer.swapchainResources[ gRenderer.currentBuffer ].drawCommandBuffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_NV, gRenderer.psoRayGen );
+
 	CmdTraceRaysNV(
 		gRenderer.swapchainResources[ gRenderer.currentBuffer ].drawCommandBuffer,
 		gRenderer.raytracer.rayGenBindingTable,
