@@ -19,11 +19,6 @@ struct aeWindowEvent
     {
         Empty, Close, Mouse1Down, Mouse1Up, Mouse2Down, Mouse2Up, MouseMiddleDown, MouseMiddleUp,
         MouseWheelScrollDown, MouseWheelScrollUp, MouseMove, KeyDown, KeyUp,
-        GamePadButtonA, GamePadButtonB, GamePadButtonX,
-        GamePadButtonY, GamePadButtonDPadUp, GamePadButtonDPadDown,
-        GamePadButtonDPadLeft, GamePadButtonDPadRight, GamePadButtonStart,
-        GamePadButtonBack, GamePadButtonLeftShoulder, GamePadButtonRightShoulder,
-        GamePadLeftThumbState, GamePadRightThumbState
     };
 
     enum class KeyCode
@@ -36,9 +31,6 @@ struct aeWindowEvent
     KeyCode keyCode = KeyCode::None;
     int x = 0;
     int y = 0;
-    float gamePadThumbX = 0;
-    /// Gamepad's thumb y in range [-1, 1]. Event type indicates left or right thumb.
-    float gamePadThumbY = 0;
 };
 
 struct aeWindowImpl
@@ -48,7 +40,6 @@ struct aeWindowImpl
     unsigned windowWidth = 0;
     unsigned windowHeight = 0;
     unsigned windowHeightWithoutTitleBar = 0;
-    bool isGamePadConnected = false;
     HWND hwnd = nullptr;
     aeWindowEvent::KeyCode keyMap[ 256 ] = {};
 };
