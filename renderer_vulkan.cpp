@@ -74,6 +74,10 @@ struct Renderer
 	VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
     VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
 	ShaderBindingTable sbt;
+	VkImage outputImage = VK_NULL_HANDLE;
+	VkDeviceMemory outputImageMemory = VK_NULL_HANDLE;
+	VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
+	VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
 } gRenderer;
 
 PFN_vkCreateSwapchainKHR createSwapchainKHR;
@@ -561,7 +565,7 @@ void CreateDevice()
     layoutBindingImage.binding = 0;
     layoutBindingImage.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
     layoutBindingImage.descriptorCount = TextureCount;
-    layoutBindingImage.stageFlags = VK_SHADER_STAGE_ANY_HIT_BIT_NV;
+    layoutBindingImage.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NV;
 
     constexpr unsigned bindingCount = 1;
     VkDescriptorSetLayoutBinding bindings[ bindingCount ] = { layoutBindingImage };
@@ -572,7 +576,6 @@ void CreateDevice()
     setCreateInfo.pBindings = bindings;
 
     VK_CHECK( vkCreateDescriptorSetLayout( gRenderer.device, &setCreateInfo, nullptr, &gRenderer.descriptorSetLayout ) );
-
 }
 
 #ifdef _MSC_VER
@@ -1088,6 +1091,76 @@ void CreatePSO()
 	VK_CHECK( CreateRayTracingPipelinesNV( gRenderer.device, nullptr, 1, &info, nullptr, &gRenderer.psoRayGen ) );
 }
 
+static void CreateDescriptorSet()
+{
+	VkDescriptorPoolSize poolSize = {};
+	poolSize.descriptorCount = 1;
+	poolSize.type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+
+	VkDescriptorPoolCreateInfo poolInfo = {};
+	poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	poolInfo.poolSizeCount = 1;
+	poolInfo.pPoolSizes = &poolSize;
+	poolInfo.maxSets = 1;
+	poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+
+	VK_CHECK( vkCreateDescriptorPool( gRenderer.device, &poolInfo, nullptr, &gRenderer.descriptorPool ) );
+
+	VkDescriptorSetAllocateInfo allocInfo = {};
+	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	allocInfo.descriptorPool = gRenderer.descriptorPool;
+	allocInfo.descriptorSetCount = 1;
+	allocInfo.pSetLayouts = &gRenderer.descriptorSetLayout;
+
+	VK_CHECK( vkAllocateDescriptorSets( gRenderer.device, &allocInfo, &gRenderer.descriptorSet ) );
+
+	VkDescriptorImageInfo samplerDesc = {};
+	samplerDesc.sampler = gRenderer.sampler;
+	samplerDesc.imageView = gRenderer.outputImageView;
+	samplerDesc.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+	VkWriteDescriptorSet imageSet = {};
+	imageSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	imageSet.dstSet = gRenderer.descriptorSet;
+	imageSet.descriptorCount = 1;
+	imageSet.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+	imageSet.pImageInfo = &samplerDesc;
+	imageSet.dstBinding = 0;
+
+	vkUpdateDescriptorSets( gRenderer.device, 1, &imageSet, 0, nullptr );
+}
+
+static void CreateOutputImage()
+{
+	VkImageCreateInfo imageInfo = {};
+	imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	imageInfo.imageType = VK_IMAGE_TYPE_2D;
+	imageInfo.format = VK_FORMAT_B8G8R8A8_UNORM;
+	imageInfo.extent.width = gRenderer.width;
+	imageInfo.extent.height = gRenderer.height;
+	imageInfo.extent.depth = 1;
+	imageInfo.mipLevels = 1;
+	imageInfo.arrayLayers = 1;
+	imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+	imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+	imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_STORAGE_BIT;
+	imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	VK_CHECK( vkCreateImage( gRenderer.device, &imageInfo, nullptr, &gRenderer.outputImage ) );
+
+	VkMemoryRequirements memReqs = {};
+	vkGetImageMemoryRequirements( gRenderer.device, gRenderer.outputImage, &memReqs );
+
+	VkMemoryAllocateInfo memAllocInfo = {};
+	memAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	memAllocInfo.allocationSize = memReqs.size;
+	memAllocInfo.memoryTypeIndex = GetMemoryType( memReqs.memoryTypeBits, gRenderer.deviceMemoryProperties, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+
+	VK_CHECK( vkAllocateMemory( gRenderer.device, &memAllocInfo, nullptr, &gRenderer.outputImageMemory ) );
+	SetObjectName( gRenderer.device, (uint64_t)gRenderer.outputImageMemory, VK_OBJECT_TYPE_DEVICE_MEMORY, "tex2d dds memory" );
+
+	VK_CHECK( vkBindImageMemory( gRenderer.device, gRenderer.outputImage, gRenderer.outputImageMemory, 0 ) );
+}
+
 void CreateBuffer( VkBuffer& outBuffer, VkDeviceMemory& outMemory, unsigned size, const char* debugName )
 {
     VkBufferCreateInfo bufferInfo = {};
@@ -1142,6 +1215,8 @@ void aeCreateRenderer( unsigned& width, unsigned& height, xcb_connection_t* conn
     LoadShaders();
 	CreateRaytracerResources();
 	CreatePSO();
+	CreateOutputImage();
+	CreateDescriptorSet();
 }
 
 void aeBeginFrame()
