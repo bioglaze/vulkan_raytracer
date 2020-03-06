@@ -75,9 +75,11 @@ struct Renderer
     VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
 	ShaderBindingTable sbt;
 	VkImage outputImage = VK_NULL_HANDLE;
+	VkImageView outputImageView = VK_NULL_HANDLE;
 	VkDeviceMemory outputImageMemory = VK_NULL_HANDLE;
 	VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
 	VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
+	VkSampler sampler = VK_NULL_HANDLE;
 } gRenderer;
 
 PFN_vkCreateSwapchainKHR createSwapchainKHR;
@@ -724,7 +726,7 @@ void CreateSwapchain( unsigned& width, unsigned& height, int presentInterval, st
     swapchainInfo.imageFormat = gRenderer.colorFormat;
     swapchainInfo.imageColorSpace = surfFormats[ 0 ].colorSpace;
     swapchainInfo.imageExtent = { swapchainExtent.width, swapchainExtent.height };
-    swapchainInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    swapchainInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
     swapchainInfo.preTransform = (VkSurfaceTransformFlagBitsKHR)preTransform;
     swapchainInfo.imageArrayLayers = 1;
     swapchainInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
@@ -1143,7 +1145,7 @@ static void CreateOutputImage()
 	imageInfo.arrayLayers = 1;
 	imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
 	imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-	imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_STORAGE_BIT;
+	imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 	imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 	VK_CHECK( vkCreateImage( gRenderer.device, &imageInfo, nullptr, &gRenderer.outputImage ) );
 
@@ -1159,6 +1161,36 @@ static void CreateOutputImage()
 	SetObjectName( gRenderer.device, (uint64_t)gRenderer.outputImageMemory, VK_OBJECT_TYPE_DEVICE_MEMORY, "tex2d dds memory" );
 
 	VK_CHECK( vkBindImageMemory( gRenderer.device, gRenderer.outputImage, gRenderer.outputImageMemory, 0 ) );
+
+	VkImageViewCreateInfo viewInfo = {};
+	viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+	viewInfo.format = imageInfo.format;
+	viewInfo.components = { VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY };
+	viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	viewInfo.subresourceRange.baseMipLevel = 0;
+	viewInfo.subresourceRange.baseArrayLayer = 0;
+	viewInfo.subresourceRange.layerCount = 1;
+	viewInfo.subresourceRange.levelCount = 1;
+	viewInfo.image = gRenderer.outputImage;
+	VK_CHECK( vkCreateImageView( gRenderer.device, &viewInfo, nullptr, &gRenderer.outputImageView ) );
+
+	VkSamplerCreateInfo samplerInfo = {};
+	samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+	samplerInfo.magFilter = VK_FILTER_NEAREST;
+	samplerInfo.minFilter = VK_FILTER_NEAREST;
+	samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+	samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	samplerInfo.addressModeV = samplerInfo.addressModeU;
+	samplerInfo.addressModeW = samplerInfo.addressModeU;
+	samplerInfo.mipLodBias = 0;
+	samplerInfo.compareOp = VK_COMPARE_OP_NEVER;
+	samplerInfo.minLod = 0;
+	samplerInfo.maxLod = 1;
+	samplerInfo.maxAnisotropy = 1;
+	samplerInfo.anisotropyEnable = VK_FALSE;
+	samplerInfo.borderColor = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
+	VK_CHECK( vkCreateSampler( gRenderer.device, &samplerInfo, nullptr, &gRenderer.sampler ) );
 }
 
 void CreateBuffer( VkBuffer& outBuffer, VkDeviceMemory& outMemory, unsigned size, const char* debugName )
@@ -1281,6 +1313,15 @@ void TraceRays()
 		gRenderer.height,
 		1
 	);
+
+	VkImageCopy copy_region = {};
+	copy_region.srcSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
+	copy_region.srcOffset = { 0, 0, 0 };
+	copy_region.dstSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
+	copy_region.dstOffset = { 0, 0, 0 };
+	copy_region.extent = { (uint32_t)gRenderer.width, (uint32_t)gRenderer.height, 1 };
+	vkCmdCopyImage( gRenderer.swapchainResources[ gRenderer.currentBuffer ].drawCommandBuffer, gRenderer.outputImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+		gRenderer.swapchainResources[ gRenderer.currentBuffer ].image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy_region );
 }
 
 void aeEndFrame()
