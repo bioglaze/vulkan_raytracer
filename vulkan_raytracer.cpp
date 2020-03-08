@@ -2,7 +2,7 @@
 //
 // Author: Timo Wiren
 // License: MIT
-// Modified: 2020-01-16
+// Modified: 2020-03-08
 #include <stdio.h>
 
 #ifdef _MSC_VER
@@ -68,9 +68,7 @@ int main()
         }
 
         aeBeginFrame();
-        //aeBeginRenderPass();
 		TraceRays();
-        //aeEndRenderPass();
         aeEndFrame();
     }
 }

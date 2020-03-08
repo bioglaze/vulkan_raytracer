@@ -50,7 +50,6 @@ struct Renderer
     VkPhysicalDeviceProperties properties = {};
     VkPhysicalDeviceFeatures features = {};
     VkFormat colorFormat = VK_FORMAT_UNDEFINED;
-    VkFormat depthFormat = VK_FORMAT_UNDEFINED;
     VkPhysicalDeviceMemoryProperties deviceMemoryProperties;
     VkDebugUtilsMessengerEXT dbgMessenger = VK_NULL_HANDLE;
     SwapchainResource swapchainResources[ 4 ] = {};
@@ -536,21 +535,6 @@ void CreateDevice()
     vkGetPhysicalDeviceMemoryProperties( gRenderer.physicalDevice, &gRenderer.deviceMemoryProperties );
     vkGetDeviceQueue( gRenderer.device, graphicsQueueIndex, 0, &gRenderer.graphicsQueue );
 
-    const VkFormat depthFormats[ 4 ] = { VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT, VK_FORMAT_D16_UNORM_S8_UINT, VK_FORMAT_D16_UNORM };
-        
-    for (unsigned i = 0; i < 4; ++i)
-    {
-        VkFormatProperties formatProps;
-        vkGetPhysicalDeviceFormatProperties( gRenderer.physicalDevice, depthFormats[ i ], &formatProps );
-
-        if ((formatProps.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) && gRenderer.depthFormat == VK_FORMAT_UNDEFINED)
-        {
-            gRenderer.depthFormat = depthFormats[ i ];
-        }
-    }
-
-    cassert( gRenderer.depthFormat != VK_FORMAT_UNDEFINED && "undefined depth format!" );
-
     VkPhysicalDeviceRayTracingPropertiesNV rtProps{};
     rtProps.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PROPERTIES_NV;
     rtProps.maxRecursionDepth = 0;
@@ -776,63 +760,6 @@ void CreateSwapchain( unsigned& width, unsigned& height, int presentInterval, st
     }
 }
 
-void CreateDepthStencil()
-{
-    VkImageCreateInfo image = {};
-    image.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-    image.imageType = VK_IMAGE_TYPE_2D;
-    image.format = gRenderer.depthFormat;
-    image.extent = { (uint32_t)gRenderer.width, (uint32_t)gRenderer.height, 1 };
-    image.mipLevels = 1;
-    image.arrayLayers = 1;
-    image.samples = VK_SAMPLE_COUNT_1_BIT;
-    image.tiling = VK_IMAGE_TILING_OPTIMAL;
-    image.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-
-    for (unsigned i = 0; i < 4; ++i)
-    {
-        VK_CHECK( vkCreateImage( gRenderer.device, &image, nullptr, &gRenderer.swapchainResources[ i ].depthStencil.image ) );
-        SetObjectName( gRenderer.device, (uint64_t)gRenderer.swapchainResources[ i ].depthStencil.image, VK_OBJECT_TYPE_IMAGE, "depthstencil" );
-
-        VkMemoryRequirements memReqs;
-        vkGetImageMemoryRequirements( gRenderer.device, gRenderer.swapchainResources[ i ].depthStencil.image, &memReqs );
-
-        VkMemoryAllocateInfo mem_alloc = {};
-        mem_alloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-        mem_alloc.allocationSize = memReqs.size;
-        mem_alloc.memoryTypeIndex = GetMemoryType( memReqs.memoryTypeBits, gRenderer.deviceMemoryProperties, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
-        VK_CHECK( vkAllocateMemory( gRenderer.device, &mem_alloc, nullptr, &gRenderer.swapchainResources[ i ].depthStencil.mem ) );
-        SetObjectName( gRenderer.device, (uint64_t)gRenderer.swapchainResources[ i ].depthStencil.mem, VK_OBJECT_TYPE_DEVICE_MEMORY, "depthStencil" );
-
-        VK_CHECK( vkBindImageMemory( gRenderer.device, gRenderer.swapchainResources[ i ].depthStencil.image, gRenderer.swapchainResources[ i ].depthStencil.mem, 0 ) );
-        SetImageLayout( gRenderer.swapchainResources[ 0 ].drawCommandBuffer, gRenderer.swapchainResources[ i ].depthStencil.image, VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT,
-                        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 1, 0, 1, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT );
-
-        VkImageViewCreateInfo depthStencilView = {};
-        depthStencilView.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        depthStencilView.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        depthStencilView.format = gRenderer.depthFormat;
-        depthStencilView.subresourceRange = {};
-        depthStencilView.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
-        depthStencilView.subresourceRange.baseMipLevel = 0;
-        depthStencilView.subresourceRange.levelCount = 1;
-        depthStencilView.subresourceRange.baseArrayLayer = 0;
-        depthStencilView.subresourceRange.layerCount = 1;
-        depthStencilView.image = gRenderer.swapchainResources[ i ].depthStencil.image;
-        VK_CHECK( vkCreateImageView( gRenderer.device, &depthStencilView, nullptr, &gRenderer.swapchainResources[ i ].depthStencil.view ) );
-    }
-
-    VK_CHECK( vkEndCommandBuffer( gRenderer.swapchainResources[ 0 ].drawCommandBuffer ) );
-
-    VkSubmitInfo submitInfo = {};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &gRenderer.swapchainResources[ 0 ].drawCommandBuffer;
-
-    VK_CHECK( vkQueueSubmit( gRenderer.graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE ) );
-    VK_CHECK( vkQueueWaitIdle( gRenderer.graphicsQueue ) );
-}
-
 void CreateFrameBuffer()
 {
     for (uint32_t i = 0; i < gRenderer.swapchainImageCount; ++i)
@@ -897,75 +824,6 @@ void EndFrame()
     }
 
     gRenderer.frameIndex = (gRenderer.frameIndex + 1) % gRenderer.swapchainImageCount;
-}
-
-void CreateRenderPass()
-{
-	VkAttachmentDescription attachments[ 2 ] = {};
-    attachments[ 0 ].format = gRenderer.colorFormat;
-    attachments[ 0 ].samples = VK_SAMPLE_COUNT_1_BIT;
-    attachments[ 0 ].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    attachments[ 0 ].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    attachments[ 0 ].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    attachments[ 0 ].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    attachments[ 0 ].initialLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-    attachments[ 0 ].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
-    attachments[ 1 ].format = gRenderer.depthFormat;
-    attachments[ 1 ].samples = VK_SAMPLE_COUNT_1_BIT;
-    attachments[ 1 ].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    attachments[ 1 ].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    attachments[ 1 ].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    attachments[ 1 ].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    attachments[ 1 ].initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-    attachments[ 1 ].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-    const VkAttachmentReference colorReference = { 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
-    const VkAttachmentReference depthReference = { 1, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
-
-    VkSubpassDescription subpass = {};
-    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.flags = 0;
-    subpass.inputAttachmentCount = 0;
-    subpass.pInputAttachments = nullptr;
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &colorReference;
-    subpass.pResolveAttachments = nullptr;
-    subpass.pDepthStencilAttachment = &depthReference;
-    subpass.preserveAttachmentCount = 0;
-    subpass.pPreserveAttachments = nullptr;
-
-    VkRenderPassCreateInfo renderPassInfo = {};
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    renderPassInfo.attachmentCount = 2;
-    renderPassInfo.pAttachments = attachments;
-    renderPassInfo.subpassCount = 1;
-    renderPassInfo.pSubpasses = &subpass;
-    renderPassInfo.dependencyCount = 0;
-    renderPassInfo.pDependencies = nullptr;
-
-    VK_CHECK( vkCreateRenderPass( gRenderer.device, &renderPassInfo, nullptr, &gRenderer.renderPass ) );
-}
-
-void aeBeginRenderPass()
-{
-    VkClearValue clearValues[ 2 ] = {};
-    clearValues[ 1 ].depthStencil = { 1.0f, 0 };
-
-    VkRenderPassBeginInfo renderPassBeginInfo = {};
-    renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    renderPassBeginInfo.renderPass = gRenderer.renderPass;
-	renderPassBeginInfo.renderArea = { { 0, 0, }, { (uint32_t)gRenderer.width, (uint32_t)gRenderer.height } };
-    renderPassBeginInfo.clearValueCount = 2;
-    renderPassBeginInfo.pClearValues = clearValues;
-    renderPassBeginInfo.framebuffer = gRenderer.swapchainResources[ gRenderer.currentBuffer ].frameBuffer;
-
-    vkCmdBeginRenderPass( gRenderer.swapchainResources[ gRenderer.currentBuffer ].drawCommandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE );
-}
-
-void aeEndRenderPass()
-{
-    vkCmdEndRenderPass( gRenderer.swapchainResources[ gRenderer.currentBuffer ].drawCommandBuffer );
 }
 
 struct File
@@ -1241,8 +1099,6 @@ void aeCreateRenderer( unsigned& width, unsigned& height, xcb_connection_t* conn
 #else
     CreateSwapchain( width, height, 1, connection, win );
 #endif
-    CreateDepthStencil();
-    CreateRenderPass();
     CreateFrameBuffer();
     LoadShaders();
 	CreateRaytracerResources();
