@@ -758,28 +758,16 @@ void CreateSwapchain( unsigned& width, unsigned& height, int presentInterval, st
         SetImageLayout( gRenderer.swapchainResources[ 0 ].drawCommandBuffer, gRenderer.swapchainResources[ i ].image,
                         VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, 1, 0, 1, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT );
     }
-}
 
-void CreateFrameBuffer()
-{
-    for (uint32_t i = 0; i < gRenderer.swapchainImageCount; ++i)
-    {
-        VkImageView attachments[ 2 ];
+	VK_CHECK( vkEndCommandBuffer( gRenderer.swapchainResources[ 0 ].drawCommandBuffer ) );
 
-        attachments[ 0 ] = gRenderer.swapchainResources[ i ].view;
-        attachments[ 1 ] = gRenderer.swapchainResources[ i ].depthStencil.view;
+	VkSubmitInfo submitInfo = {};
+	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &gRenderer.swapchainResources[ 0 ].drawCommandBuffer;
 
-        VkFramebufferCreateInfo frameBufferCreateInfo{};
-        frameBufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        frameBufferCreateInfo.renderPass = gRenderer.renderPass;
-        frameBufferCreateInfo.attachmentCount = 2;
-        frameBufferCreateInfo.pAttachments = attachments;
-        frameBufferCreateInfo.width = gRenderer.width;
-        frameBufferCreateInfo.height = gRenderer.height;
-        frameBufferCreateInfo.layers = 1;
-        
-        VK_CHECK( vkCreateFramebuffer( gRenderer.device, &frameBufferCreateInfo, nullptr, &gRenderer.swapchainResources[ i ].frameBuffer ) );
-    }
+	VK_CHECK( vkQueueSubmit( gRenderer.graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE ) );
+	VK_CHECK( vkQueueWaitIdle( gRenderer.graphicsQueue ) );
 }
 
 void EndFrame()
@@ -1006,6 +994,7 @@ static void CreateOutputImage()
 	imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 	imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 	VK_CHECK( vkCreateImage( gRenderer.device, &imageInfo, nullptr, &gRenderer.outputImage ) );
+	SetObjectName( gRenderer.device, (uint64_t)gRenderer.outputImage, VK_OBJECT_TYPE_IMAGE, "output image" );
 
 	VkMemoryRequirements memReqs = {};
 	vkGetImageMemoryRequirements( gRenderer.device, gRenderer.outputImage, &memReqs );
@@ -1016,7 +1005,7 @@ static void CreateOutputImage()
 	memAllocInfo.memoryTypeIndex = GetMemoryType( memReqs.memoryTypeBits, gRenderer.deviceMemoryProperties, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
 
 	VK_CHECK( vkAllocateMemory( gRenderer.device, &memAllocInfo, nullptr, &gRenderer.outputImageMemory ) );
-	SetObjectName( gRenderer.device, (uint64_t)gRenderer.outputImageMemory, VK_OBJECT_TYPE_DEVICE_MEMORY, "tex2d dds memory" );
+	SetObjectName( gRenderer.device, (uint64_t)gRenderer.outputImageMemory, VK_OBJECT_TYPE_DEVICE_MEMORY, "output image memory" );
 
 	VK_CHECK( vkBindImageMemory( gRenderer.device, gRenderer.outputImage, gRenderer.outputImageMemory, 0 ) );
 
@@ -1049,6 +1038,24 @@ static void CreateOutputImage()
 	samplerInfo.anisotropyEnable = VK_FALSE;
 	samplerInfo.borderColor = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
 	VK_CHECK( vkCreateSampler( gRenderer.device, &samplerInfo, nullptr, &gRenderer.sampler ) );
+
+	VkCommandBufferBeginInfo cmdBufInfo = {};
+	cmdBufInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	cmdBufInfo.pNext = nullptr;
+
+	VK_CHECK( vkBeginCommandBuffer( gRenderer.swapchainResources[ gRenderer.currentBuffer ].drawCommandBuffer, &cmdBufInfo ) );
+
+	SetImageLayout( gRenderer.swapchainResources[ gRenderer.currentBuffer ].drawCommandBuffer, gRenderer.outputImage, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, 1, 0, 1, VK_PIPELINE_STAGE_TRANSFER_BIT );
+
+	VK_CHECK( vkEndCommandBuffer( gRenderer.swapchainResources[ 0 ].drawCommandBuffer ) );
+
+	VkSubmitInfo submitInfo = {};
+	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &gRenderer.swapchainResources[ 0 ].drawCommandBuffer;
+
+	VK_CHECK( vkQueueSubmit( gRenderer.graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE ) );
+	VK_CHECK( vkQueueWaitIdle( gRenderer.graphicsQueue ) );
 }
 
 void CreateBuffer( VkBuffer& outBuffer, VkDeviceMemory& outMemory, unsigned size, const char* debugName )
@@ -1099,7 +1106,6 @@ void aeCreateRenderer( unsigned& width, unsigned& height, xcb_connection_t* conn
 #else
     CreateSwapchain( width, height, 1, connection, win );
 #endif
-    CreateFrameBuffer();
     LoadShaders();
 	CreateRaytracerResources();
 	CreatePSO();
@@ -1170,6 +1176,8 @@ void TraceRays()
 		1
 	);
 
+	SetImageLayout( gRenderer.swapchainResources[ gRenderer.currentBuffer ].drawCommandBuffer, gRenderer.swapchainResources[ gRenderer.currentBuffer].image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, 0, 1, VK_PIPELINE_STAGE_TRANSFER_BIT );
+
 	VkImageCopy copy_region = {};
 	copy_region.srcSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
 	copy_region.srcOffset = { 0, 0, 0 };
@@ -1178,6 +1186,8 @@ void TraceRays()
 	copy_region.extent = { (uint32_t)gRenderer.width, (uint32_t)gRenderer.height, 1 };
 	vkCmdCopyImage( gRenderer.swapchainResources[ gRenderer.currentBuffer ].drawCommandBuffer, gRenderer.outputImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
 		gRenderer.swapchainResources[ gRenderer.currentBuffer ].image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy_region );
+
+	SetImageLayout( gRenderer.swapchainResources[ gRenderer.currentBuffer ].drawCommandBuffer, gRenderer.swapchainResources[ gRenderer.currentBuffer ].image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, 1, 0, 1, VK_PIPELINE_STAGE_TRANSFER_BIT );
 }
 
 void aeEndFrame()
