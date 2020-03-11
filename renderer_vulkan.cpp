@@ -57,7 +57,6 @@ struct Renderer
     VkSwapchainKHR swapchain = VK_NULL_HANDLE;
     uint32_t graphicsQueueNodeIndex = 0;
     VkCommandPool cmdPool;
-    VkRenderPass renderPass = VK_NULL_HANDLE;
     uint32_t currentBuffer = 0;
     unsigned frameIndex = 0;
     int width = 0;
@@ -549,7 +548,7 @@ void CreateDevice()
     constexpr unsigned TextureCount = 1;
     VkDescriptorSetLayoutBinding layoutBindingImage = {};
     layoutBindingImage.binding = 0;
-    layoutBindingImage.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+    layoutBindingImage.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
     layoutBindingImage.descriptorCount = TextureCount;
     layoutBindingImage.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NV;
 
@@ -965,13 +964,13 @@ static void CreateDescriptorSet()
 	VkDescriptorImageInfo samplerDesc = {};
 	samplerDesc.sampler = gRenderer.sampler;
 	samplerDesc.imageView = gRenderer.outputImageView;
-	samplerDesc.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	samplerDesc.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
 	VkWriteDescriptorSet imageSet = {};
 	imageSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 	imageSet.dstSet = gRenderer.descriptorSet;
 	imageSet.descriptorCount = 1;
-	imageSet.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+	imageSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
 	imageSet.pImageInfo = &samplerDesc;
 	imageSet.dstBinding = 0;
 
@@ -991,7 +990,7 @@ static void CreateOutputImage()
 	imageInfo.arrayLayers = 1;
 	imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
 	imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-	imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+	imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_STORAGE_BIT;
 	imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 	VK_CHECK( vkCreateImage( gRenderer.device, &imageInfo, nullptr, &gRenderer.outputImage ) );
 	SetObjectName( gRenderer.device, (uint64_t)gRenderer.outputImage, VK_OBJECT_TYPE_IMAGE, "output image" );
