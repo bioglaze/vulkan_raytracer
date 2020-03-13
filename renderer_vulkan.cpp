@@ -193,8 +193,11 @@ VKAPI_ATTR VkBool32 VKAPI_CALL dbgFunc( VkDebugUtilsMessageSeverityFlagBitsEXT m
             printf( "Object %u: name: %s, type: %s\n", i, name, getObjectType( callbackData->pObjects[ i ].objectType ) );
         }
     }
-    
-    cassert( !"Vulkan debug message" );
+ 
+	if( msgSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT )
+	{
+		cassert( !"Vulkan debug error" );
+	}
 
     return VK_FALSE;
 }
@@ -1156,6 +1159,7 @@ void aeBeginFrame()
 void TraceRays()
 {
 	vkCmdBindPipeline( gRenderer.swapchainResources[ gRenderer.currentBuffer ].drawCommandBuffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_NV, gRenderer.psoRayGen );
+	vkCmdBindDescriptorSets( gRenderer.swapchainResources[ gRenderer.currentBuffer ].drawCommandBuffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_NV, gRenderer.pipelineLayout, 0, 1, &gRenderer.descriptorSet, 0, nullptr );
 
 	CmdTraceRaysNV(
 		gRenderer.swapchainResources[ gRenderer.currentBuffer ].drawCommandBuffer,
@@ -1184,7 +1188,7 @@ void TraceRays()
 	copy_region.dstOffset = { 0, 0, 0 };
 	copy_region.extent = { (uint32_t)gRenderer.width, (uint32_t)gRenderer.height, 1 };
 	vkCmdCopyImage( gRenderer.swapchainResources[ gRenderer.currentBuffer ].drawCommandBuffer, gRenderer.outputImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-		gRenderer.swapchainResources[ gRenderer.currentBuffer ].image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy_region );
+			gRenderer.swapchainResources[ gRenderer.currentBuffer ].image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy_region );
 
 	SetImageLayout( gRenderer.swapchainResources[ gRenderer.currentBuffer ].drawCommandBuffer, gRenderer.swapchainResources[ gRenderer.currentBuffer ].image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, 1, 0, 1, VK_PIPELINE_STAGE_TRANSFER_BIT );
 }
