@@ -1,8 +1,8 @@
 #version 460
-#extension GL_NV_ray_tracing : require
+#extension GL_EXT_ray_tracing : require
 
-layout(location = 0) rayPayloadInNV vec3 outColor;
-//layout(location = 1) hitAttributeNV vec2 hitAttribs;
+layout(location = 0) rayPayloadInEXT vec3 outColor;
+//layout(location = 1) hitAttributeEXT vec2 hitAttribs;
 
 void main()
 {

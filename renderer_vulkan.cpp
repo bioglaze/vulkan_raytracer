@@ -1,5 +1,6 @@
 // This is an independent project of an individual developer. Dear PVS-Studio, please check it.
 // PVS-Studio Static Code Analyzer for C, C++, C#, and Java: http://www.viva64.com
+#define VK_ENABLE_BETA_EXTENSIONS
 #include <vulkan/vulkan.h>
 #include <stdio.h>
 
@@ -24,20 +25,20 @@ struct SwapchainResource
 
 struct Raytracer
 {
-	VkBuffer rayGenBindingTable = VK_NULL_HANDLE;
+    VkStridedBufferRegionKHR rayGenBindingTable;
     VkDeviceMemory rayGenBindingMemory = VK_NULL_HANDLE;
-	VkBuffer rayMissBindingTable = VK_NULL_HANDLE;
+    VkStridedBufferRegionKHR rayMissBindingTable;
     VkDeviceMemory rayMissBindingMemory = VK_NULL_HANDLE;
-	VkBuffer rayHitBindingTable = VK_NULL_HANDLE;
+    VkStridedBufferRegionKHR rayHitBindingTable;
     VkDeviceMemory rayHitBindingMemory = VK_NULL_HANDLE;
-	VkBuffer rayCallableBindingTable = VK_NULL_HANDLE;
+    VkStridedBufferRegionKHR rayCallableBindingTable;
     VkDeviceMemory rayCallableBindingMemory = VK_NULL_HANDLE;
 };
 
 struct ShaderBindingTable
 {
 	const unsigned groupCount = 1;
-	VkRayTracingShaderGroupCreateInfoNV groups[ 1 ] = {};
+	VkRayTracingShaderGroupCreateInfoKHR groups[ 1 ] = {};
 };
 
 struct Renderer
@@ -91,10 +92,6 @@ PFN_vkQueuePresentKHR queuePresentKHR;
 PFN_vkSetDebugUtilsObjectNameEXT setDebugUtilsObjectNameEXT;
 PFN_vkCmdBeginDebugUtilsLabelEXT CmdBeginDebugUtilsLabelEXT;
 PFN_vkCmdEndDebugUtilsLabelEXT CmdEndDebugUtilsLabelEXT;
-PFN_vkCmdTraceRaysNV CmdTraceRaysNV;
-PFN_vkCreateRayTracingPipelinesNV CreateRayTracingPipelinesNV;
-PFN_vkCmdBuildAccelerationStructureNV CmdBuildAccelerationStructureNV;
-PFN_vkCreateAccelerationStructureNV CreateAccelerationStructureNV;
 
 void SetObjectName( VkDevice device, uint64_t object, VkObjectType objectType, const char* name )
 {
@@ -114,13 +111,11 @@ const char* getObjectType( VkObjectType type )
     switch( type )
     {
     case VK_OBJECT_TYPE_QUERY_POOL: return "VK_OBJECT_TYPE_QUERY_POOL";
-    case VK_OBJECT_TYPE_OBJECT_TABLE_NVX: return "VK_OBJECT_TYPE_OBJECT_TABLE_NVX";
     case VK_OBJECT_TYPE_SAMPLER_YCBCR_CONVERSION: return "VK_OBJECT_TYPE_SAMPLER_YCBCR_CONVERSION";
     case VK_OBJECT_TYPE_SEMAPHORE: return "VK_OBJECT_TYPE_SEMAPHORE";
     case VK_OBJECT_TYPE_SHADER_MODULE: return "VK_OBJECT_TYPE_SHADER_MODULE";
     case VK_OBJECT_TYPE_SWAPCHAIN_KHR: return "VK_OBJECT_TYPE_SWAPCHAIN_KHR";
     case VK_OBJECT_TYPE_SAMPLER: return "VK_OBJECT_TYPE_SAMPLER";
-    case VK_OBJECT_TYPE_INDIRECT_COMMANDS_LAYOUT_NVX: return "VK_OBJECT_TYPE_INDIRECT_COMMANDS_LAYOUT_NVX";
     case VK_OBJECT_TYPE_DEBUG_REPORT_CALLBACK_EXT: return "VK_OBJECT_TYPE_DEBUG_REPORT_CALLBACK_EXT";
     case VK_OBJECT_TYPE_IMAGE: return "VK_OBJECT_TYPE_IMAGE";
     case VK_OBJECT_TYPE_UNKNOWN: return "VK_OBJECT_TYPE_UNKNOWN";
@@ -418,14 +413,6 @@ void LoadFunctionPointers()
     acquireNextImageKHR = (PFN_vkAcquireNextImageKHR)vkGetDeviceProcAddr( gRenderer.device, "vkAcquireNextImageKHR" );
     queuePresentKHR = (PFN_vkQueuePresentKHR)vkGetDeviceProcAddr( gRenderer.device, "vkQueuePresentKHR" );
 	setDebugUtilsObjectNameEXT = (PFN_vkSetDebugUtilsObjectNameEXT)vkGetInstanceProcAddr( gRenderer.instance, "vkSetDebugUtilsObjectNameEXT" );
-	CmdTraceRaysNV = (PFN_vkCmdTraceRaysNV)vkGetDeviceProcAddr( gRenderer.device, "vkCmdTraceRaysNV" );
-	CreateRayTracingPipelinesNV = (PFN_vkCreateRayTracingPipelinesNV)vkGetDeviceProcAddr( gRenderer.device, "vkCreateRayTracingPipelinesNV" );
-	CmdBuildAccelerationStructureNV = (PFN_vkCmdBuildAccelerationStructureNV)vkGetDeviceProcAddr( gRenderer.device, "vkCmdBuildAccelerationStructureNV" );
-	CreateAccelerationStructureNV = (PFN_vkCreateAccelerationStructureNV)vkGetDeviceProcAddr( gRenderer.device, "vkCreateAccelerationStructureNV" );
-	cassert( CmdTraceRaysNV != nullptr );
-	cassert( CreateRayTracingPipelinesNV != nullptr );
-	cassert( CmdBuildAccelerationStructureNV != nullptr );
-	cassert( CreateAccelerationStructureNV != nullptr );
 }
 
 void CreateCommandBuffers()
@@ -510,7 +497,7 @@ void CreateDevice()
     queueCreateInfo.queueCount = 1;
     queueCreateInfo.pQueuePriorities = &queuePriorities;
 
-    const char* enabledExtensions[] = { VK_KHR_SWAPCHAIN_EXTENSION_NAME, VK_NV_RAY_TRACING_EXTENSION_NAME };
+    const char* enabledExtensions[] = { VK_KHR_SWAPCHAIN_EXTENSION_NAME, VK_KHR_RAY_TRACING_EXTENSION_NAME };
 
     vkGetPhysicalDeviceFeatures( gRenderer.physicalDevice, &gRenderer.features );
 
@@ -925,7 +912,7 @@ void CreatePSO()
 	gRenderer.sbt.groups[ 0 ].generalShader = 0;
 	gRenderer.sbt.groups[ 0 ].intersectionShader = VK_SHADER_UNUSED_NV;
 
-	VkRayTracingPipelineCreateInfoNV info{};
+	VkRayTracingPipelineCreateInfoKHR info{};
 	info.sType = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_NV;
 	info.pNext = nullptr;
 	info.flags = 0;
@@ -938,7 +925,7 @@ void CreatePSO()
 	info.groupCount = gRenderer.sbt.groupCount;
 	info.pGroups = gRenderer.sbt.groups;
 
-	VK_CHECK( CreateRayTracingPipelinesNV( gRenderer.device, nullptr, 1, &info, nullptr, &gRenderer.psoRayGen ) );
+	VK_CHECK( vkCreateRayTracingPipelinesKHR( gRenderer.device, nullptr, 1, &info, nullptr, &gRenderer.psoRayGen ) );
 }
 
 static void CreateDescriptorSet()
@@ -1087,10 +1074,10 @@ void CreateRaytracerResources()
     unsigned numberOfGroups = 666; // FIXME: Fill this
     unsigned sizeOfGroup = 32; // FIXME: Fill this
     
-    CreateBuffer( gRenderer.raytracer.rayGenBindingTable, gRenderer.raytracer.rayGenBindingMemory, numberOfGroups * sizeOfGroup, "rayGenBindingTable" );
-    CreateBuffer( gRenderer.raytracer.rayMissBindingTable, gRenderer.raytracer.rayMissBindingMemory, numberOfGroups * sizeOfGroup, "rayMissBindingTable" );
-    CreateBuffer( gRenderer.raytracer.rayHitBindingTable, gRenderer.raytracer.rayHitBindingMemory, numberOfGroups * sizeOfGroup, "rayHitBindingTable" );
-    CreateBuffer( gRenderer.raytracer.rayCallableBindingTable, gRenderer.raytracer.rayCallableBindingMemory, numberOfGroups * sizeOfGroup, "rayCallableBindingTable" );
+    CreateBuffer( gRenderer.raytracer.rayGenBindingTable.buffer, gRenderer.raytracer.rayGenBindingMemory, numberOfGroups * sizeOfGroup, "rayGenBindingTable" );
+    CreateBuffer( gRenderer.raytracer.rayMissBindingTable.buffer, gRenderer.raytracer.rayMissBindingMemory, numberOfGroups * sizeOfGroup, "rayMissBindingTable" );
+    CreateBuffer( gRenderer.raytracer.rayHitBindingTable.buffer, gRenderer.raytracer.rayHitBindingMemory, numberOfGroups * sizeOfGroup, "rayHitBindingTable" );
+    CreateBuffer( gRenderer.raytracer.rayCallableBindingTable.buffer, gRenderer.raytracer.rayCallableBindingMemory, numberOfGroups * sizeOfGroup, "rayCallableBindingTable" );
 }
 
 #ifdef _MSC_VER
@@ -1161,19 +1148,12 @@ void TraceRays()
 	vkCmdBindPipeline( gRenderer.swapchainResources[ gRenderer.currentBuffer ].drawCommandBuffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_NV, gRenderer.psoRayGen );
 	vkCmdBindDescriptorSets( gRenderer.swapchainResources[ gRenderer.currentBuffer ].drawCommandBuffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_NV, gRenderer.pipelineLayout, 0, 1, &gRenderer.descriptorSet, 0, nullptr );
 
-	CmdTraceRaysNV(
+	vkCmdTraceRaysKHR(
 		gRenderer.swapchainResources[ gRenderer.currentBuffer ].drawCommandBuffer,
-		gRenderer.raytracer.rayGenBindingTable,
-		0,
-		gRenderer.raytracer.rayMissBindingTable,
-		0,
-		0,
-		gRenderer.raytracer.rayHitBindingTable,
-		0,
-		0,
-		gRenderer.raytracer.rayCallableBindingTable,
-		0,
-		0,
+		&gRenderer.raytracer.rayGenBindingTable,
+		&gRenderer.raytracer.rayMissBindingTable,
+		&gRenderer.raytracer.rayHitBindingTable,
+		&gRenderer.raytracer.rayCallableBindingTable,
 		gRenderer.width,
 		gRenderer.height,
 		1
