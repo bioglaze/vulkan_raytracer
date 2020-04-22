@@ -92,6 +92,8 @@ PFN_vkQueuePresentKHR queuePresentKHR;
 PFN_vkSetDebugUtilsObjectNameEXT setDebugUtilsObjectNameEXT;
 PFN_vkCmdBeginDebugUtilsLabelEXT CmdBeginDebugUtilsLabelEXT;
 PFN_vkCmdEndDebugUtilsLabelEXT CmdEndDebugUtilsLabelEXT;
+PFN_vkCmdTraceRaysKHR CmdTraceRaysKHR;
+PFN_vkCreateRayTracingPipelinesKHR CreateRayTracingPipelinesKHR;
 
 void SetObjectName( VkDevice device, uint64_t object, VkObjectType objectType, const char* name )
 {
@@ -396,7 +398,7 @@ void CreateInstance()
         result = dbgCreateDebugUtilsMessenger( gRenderer.instance, &dbg_messenger_create_info, nullptr, &gRenderer.dbgMessenger );
 
         CmdBeginDebugUtilsLabelEXT = (PFN_vkCmdBeginDebugUtilsLabelEXT)vkGetInstanceProcAddr( gRenderer.instance, "vkCmdBeginDebugUtilsLabelEXT" );
-        CmdEndDebugUtilsLabelEXT = (PFN_vkCmdEndDebugUtilsLabelEXT)vkGetInstanceProcAddr( gRenderer.instance, "vkCmdEndDebugUtilsLabelEXT" );
+		CmdEndDebugUtilsLabelEXT = (PFN_vkCmdEndDebugUtilsLabelEXT)vkGetInstanceProcAddr( gRenderer.instance, "vkCmdEndDebugUtilsLabelEXT" );
     }
 #endif
     cassert( result == VK_SUCCESS );
@@ -413,6 +415,11 @@ void LoadFunctionPointers()
     acquireNextImageKHR = (PFN_vkAcquireNextImageKHR)vkGetDeviceProcAddr( gRenderer.device, "vkAcquireNextImageKHR" );
     queuePresentKHR = (PFN_vkQueuePresentKHR)vkGetDeviceProcAddr( gRenderer.device, "vkQueuePresentKHR" );
 	setDebugUtilsObjectNameEXT = (PFN_vkSetDebugUtilsObjectNameEXT)vkGetInstanceProcAddr( gRenderer.instance, "vkSetDebugUtilsObjectNameEXT" );
+
+	CmdTraceRaysKHR = (PFN_vkCmdTraceRaysKHR)vkGetDeviceProcAddr( gRenderer.device, "vkCmdTraceRaysKHR" );
+	CreateRayTracingPipelinesKHR = (PFN_vkCreateRayTracingPipelinesKHR)vkGetDeviceProcAddr( gRenderer.device, "vkCreateRayTracingPipelinesKHR" );
+	cassert( CmdTraceRaysKHR );
+	cassert( CreateRayTracingPipelinesKHR );
 }
 
 void CreateCommandBuffers()
@@ -925,7 +932,7 @@ void CreatePSO()
 	info.groupCount = gRenderer.sbt.groupCount;
 	info.pGroups = gRenderer.sbt.groups;
 
-	VK_CHECK( vkCreateRayTracingPipelinesKHR( gRenderer.device, nullptr, 1, &info, nullptr, &gRenderer.psoRayGen ) );
+	VK_CHECK( CreateRayTracingPipelinesKHR( gRenderer.device, nullptr, 1, &info, nullptr, &gRenderer.psoRayGen ) );
 }
 
 static void CreateDescriptorSet()
@@ -1148,7 +1155,7 @@ void TraceRays()
 	vkCmdBindPipeline( gRenderer.swapchainResources[ gRenderer.currentBuffer ].drawCommandBuffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_NV, gRenderer.psoRayGen );
 	vkCmdBindDescriptorSets( gRenderer.swapchainResources[ gRenderer.currentBuffer ].drawCommandBuffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_NV, gRenderer.pipelineLayout, 0, 1, &gRenderer.descriptorSet, 0, nullptr );
 
-	vkCmdTraceRaysKHR(
+	CmdTraceRaysKHR(
 		gRenderer.swapchainResources[ gRenderer.currentBuffer ].drawCommandBuffer,
 		&gRenderer.raytracer.rayGenBindingTable,
 		&gRenderer.raytracer.rayMissBindingTable,
