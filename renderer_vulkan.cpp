@@ -332,7 +332,7 @@ void CreateInstance()
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     appInfo.pApplicationName = "VulkanRaytracer";
     appInfo.pEngineName = "VulkanRaytracer";
-    appInfo.apiVersion = VK_API_VERSION_1_1;
+    appInfo.apiVersion = VK_API_VERSION_1_2;
 
     uint32_t extensionCount = 0;
     vkEnumerateInstanceExtensionProperties( nullptr, &extensionCount, nullptr );
