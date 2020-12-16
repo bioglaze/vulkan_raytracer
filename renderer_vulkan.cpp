@@ -1,6 +1,6 @@
 // This is an independent project of an individual developer. Dear PVS-Studio, please check it.
 // PVS-Studio Static Code Analyzer for C, C++, C#, and Java: http://www.viva64.com
-#define VK_ENABLE_BETA_EXTENSIONS
+//#define VK_ENABLE_BETA_EXTENSIONS
 #include <vulkan/vulkan.h>
 #include <stdio.h>
 
@@ -25,13 +25,20 @@ struct SwapchainResource
 
 struct Raytracer
 {
-    VkStridedBufferRegionKHR rayGenBindingTable = {};
+    VkStridedDeviceAddressRegionKHR rayGenBindingTable = {};
+	VkBuffer rayGenBindingBuffer = VK_NULL_HANDLE;
     VkDeviceMemory rayGenBindingMemory = VK_NULL_HANDLE;
-    VkStridedBufferRegionKHR rayMissBindingTable = {};
-    VkDeviceMemory rayMissBindingMemory = VK_NULL_HANDLE;
-    VkStridedBufferRegionKHR rayHitBindingTable = {};
+	
+	VkStridedDeviceAddressRegionKHR rayMissBindingTable = {};
+	VkBuffer rayMissBindingBuffer = VK_NULL_HANDLE; 
+	VkDeviceMemory rayMissBindingMemory = VK_NULL_HANDLE;
+	
+	VkStridedDeviceAddressRegionKHR rayHitBindingTable = {};
+	VkBuffer rayHitBindingBuffer = VK_NULL_HANDLE;
     VkDeviceMemory rayHitBindingMemory = VK_NULL_HANDLE;
-    VkStridedBufferRegionKHR rayCallableBindingTable = {};
+
+	VkStridedDeviceAddressRegionKHR rayCallableBindingTable = {};
+	VkBuffer rayCallableBindingBuffer = VK_NULL_HANDLE;
     VkDeviceMemory rayCallableBindingMemory = VK_NULL_HANDLE;
 };
 
@@ -506,7 +513,7 @@ void CreateDevice()
     queueCreateInfo.queueCount = 1;
     queueCreateInfo.pQueuePriorities = &queuePriorities;
 
-    const char* enabledExtensions[] = { VK_KHR_SWAPCHAIN_EXTENSION_NAME, VK_KHR_RAY_TRACING_EXTENSION_NAME };
+    const char* enabledExtensions[] = { VK_KHR_SWAPCHAIN_EXTENSION_NAME, VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME, VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME, VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME };
 
     vkGetPhysicalDeviceFeatures( gRenderer.physicalDevice, &gRenderer.features );
 
@@ -518,14 +525,15 @@ void CreateDevice()
     enabledFeatures.samplerAnisotropy = gRenderer.features.samplerAnisotropy;
     enabledFeatures.fragmentStoresAndAtomics = gRenderer.features.fragmentStoresAndAtomics;
     enabledFeatures.shaderStorageImageExtendedFormats = gRenderer.features.shaderStorageImageExtendedFormats;
-    enabledFeatures.vertexPipelineStoresAndAtomics = gRenderer.features.vertexPipelineStoresAndAtomics;
+	enabledFeatures.vertexPipelineStoresAndAtomics = gRenderer.features.vertexPipelineStoresAndAtomics;
+	enabledFeatures.vertexPipelineStoresAndAtomics = gRenderer.features.vertexPipelineStoresAndAtomics;
 
     VkDeviceCreateInfo deviceCreateInfo = {};
     deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
     deviceCreateInfo.queueCreateInfoCount = 1;
     deviceCreateInfo.pQueueCreateInfos = &queueCreateInfo;
     deviceCreateInfo.pEnabledFeatures = &enabledFeatures;
-    deviceCreateInfo.enabledExtensionCount = 2;
+    deviceCreateInfo.enabledExtensionCount = 4;
     deviceCreateInfo.ppEnabledExtensionNames = enabledExtensions;
 
     VK_CHECK( vkCreateDevice( gRenderer.physicalDevice, &deviceCreateInfo, nullptr, &gRenderer.device ) );
@@ -533,9 +541,9 @@ void CreateDevice()
     vkGetPhysicalDeviceMemoryProperties( gRenderer.physicalDevice, &gRenderer.deviceMemoryProperties );
     vkGetDeviceQueue( gRenderer.device, graphicsQueueIndex, 0, &gRenderer.graphicsQueue );
 
-    VkPhysicalDeviceRayTracingPropertiesKHR rtProps{};
-    rtProps.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PROPERTIES_KHR;
-    rtProps.maxRecursionDepth = 0;
+	VkPhysicalDeviceRayTracingPipelinePropertiesKHR rtProps{};
+    rtProps.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR;
+    rtProps.maxRayRecursionDepth = 0;
 
     VkPhysicalDeviceProperties2 devProps;
     devProps.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
@@ -565,7 +573,7 @@ void CreateDevice()
     VkBufferCreateInfo bufferInfo = {};
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     bufferInfo.size = sbtSize;
-    bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_RAY_TRACING_BIT_KHR;
+    bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR;
     VK_CHECK( vkCreateBuffer( gRenderer.device, &bufferInfo, nullptr, &gRenderer.sbt.buffer ) );
 
     VkMemoryRequirements memReqs;
@@ -944,14 +952,15 @@ void CreatePSO()
 	info.flags = 0;
 	info.stageCount = StageCount;
 	info.pStages = stages;
-	info.maxRecursionDepth = 1;
+	info.maxPipelineRayRecursionDepth = 1;
 	info.layout = gRenderer.pipelineLayout;
 	info.basePipelineHandle = VK_NULL_HANDLE;
 	info.basePipelineIndex = 0;
 	info.groupCount = gRenderer.sbt.groupCount;
 	info.pGroups = gRenderer.sbt.groups;
 
-	VK_CHECK( CreateRayTracingPipelinesKHR( gRenderer.device, nullptr, 1, &info, nullptr, &gRenderer.psoRayGen ) );
+//	typedef VkResult( VKAPI_PTR *PFN_vkCreateRayTracingPipelinesKHR )( VkDevice device, VkDeferredOperationKHR deferredOperation, VkPipelineCache pipelineCache, uint32_t createInfoCount, const VkRayTracingPipelineCreateInfoKHR* pCreateInfos, const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines );
+	VK_CHECK( CreateRayTracingPipelinesKHR( gRenderer.device, nullptr, VK_NULL_HANDLE, 1, &info, nullptr, &gRenderer.psoRayGen ) );
 }
 
 static void CreateDescriptorSet()
@@ -1100,10 +1109,10 @@ void CreateRaytracerResources()
     unsigned numberOfGroups = 666; // FIXME: Fill this
     unsigned sizeOfGroup = 32; // FIXME: Fill this
     
-    CreateBuffer( gRenderer.raytracer.rayGenBindingTable.buffer, gRenderer.raytracer.rayGenBindingMemory, numberOfGroups * sizeOfGroup, "rayGenBindingTable" );
-    CreateBuffer( gRenderer.raytracer.rayMissBindingTable.buffer, gRenderer.raytracer.rayMissBindingMemory, numberOfGroups * sizeOfGroup, "rayMissBindingTable" );
-    CreateBuffer( gRenderer.raytracer.rayHitBindingTable.buffer, gRenderer.raytracer.rayHitBindingMemory, numberOfGroups * sizeOfGroup, "rayHitBindingTable" );
-    CreateBuffer( gRenderer.raytracer.rayCallableBindingTable.buffer, gRenderer.raytracer.rayCallableBindingMemory, numberOfGroups * sizeOfGroup, "rayCallableBindingTable" );
+    CreateBuffer( gRenderer.raytracer.rayGenBindingBuffer, gRenderer.raytracer.rayGenBindingMemory, numberOfGroups * sizeOfGroup, "rayGenBindingTable" );
+    CreateBuffer( gRenderer.raytracer.rayMissBindingBuffer, gRenderer.raytracer.rayMissBindingMemory, numberOfGroups * sizeOfGroup, "rayMissBindingTable" );
+    CreateBuffer( gRenderer.raytracer.rayHitBindingBuffer, gRenderer.raytracer.rayHitBindingMemory, numberOfGroups * sizeOfGroup, "rayHitBindingTable" );
+    CreateBuffer( gRenderer.raytracer.rayCallableBindingBuffer, gRenderer.raytracer.rayCallableBindingMemory, numberOfGroups * sizeOfGroup, "rayCallableBindingTable" );
 }
 
 #ifdef _MSC_VER
