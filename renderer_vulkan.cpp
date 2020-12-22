@@ -103,6 +103,7 @@ PFN_vkCmdBeginDebugUtilsLabelEXT CmdBeginDebugUtilsLabelEXT;
 PFN_vkCmdEndDebugUtilsLabelEXT CmdEndDebugUtilsLabelEXT;
 PFN_vkCmdTraceRaysKHR CmdTraceRaysKHR;
 PFN_vkCreateRayTracingPipelinesKHR CreateRayTracingPipelinesKHR;
+//PFN_vkGetPhysicalDeviceFeatures2KHR GetPhysicalDeviceFeatures2KHR;
 
 void SetObjectName( VkDevice device, uint64_t object, VkObjectType objectType, const char* name )
 {
@@ -426,9 +427,12 @@ void LoadFunctionPointers()
 	setDebugUtilsObjectNameEXT = (PFN_vkSetDebugUtilsObjectNameEXT)vkGetInstanceProcAddr( gRenderer.instance, "vkSetDebugUtilsObjectNameEXT" );
 
 	CmdTraceRaysKHR = (PFN_vkCmdTraceRaysKHR)vkGetDeviceProcAddr( gRenderer.device, "vkCmdTraceRaysKHR" );
-	CreateRayTracingPipelinesKHR = (PFN_vkCreateRayTracingPipelinesKHR)vkGetDeviceProcAddr( gRenderer.device, "vkCreateRayTracingPipelinesKHR" );
+	CreateRayTracingPipelinesKHR = ( PFN_vkCreateRayTracingPipelinesKHR )vkGetDeviceProcAddr( gRenderer.device, "vkCreateRayTracingPipelinesKHR" );
+	//GetPhysicalDeviceFeatures2KHR = ( PFN_vkGetPhysicalDeviceFeatures2KHR )vkGetDeviceProcAddr( gRenderer.device, "vkGetPhysicalDeviceFeatures2KHR" );
+	
 	cassert( CmdTraceRaysKHR );
 	cassert( CreateRayTracingPipelinesKHR );
+	//cassert( GetPhysicalDeviceFeatures2KHR );
 }
 
 void CreateCommandBuffers()
@@ -528,8 +532,13 @@ void CreateDevice()
 	enabledFeatures.vertexPipelineStoresAndAtomics = gRenderer.features.vertexPipelineStoresAndAtomics;
 	enabledFeatures.vertexPipelineStoresAndAtomics = gRenderer.features.vertexPipelineStoresAndAtomics;
 
+	VkPhysicalDeviceRayTracingPipelineFeaturesKHR rayFeatures = {};
+	rayFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR;
+	rayFeatures.rayTracingPipeline = VK_TRUE;
+
     VkDeviceCreateInfo deviceCreateInfo = {};
     deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+	deviceCreateInfo.pNext = &rayFeatures;
     deviceCreateInfo.queueCreateInfoCount = 1;
     deviceCreateInfo.pQueueCreateInfos = &queueCreateInfo;
     deviceCreateInfo.pEnabledFeatures = &enabledFeatures;
@@ -545,13 +554,13 @@ void CreateDevice()
     rtProps.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR;
     rtProps.maxRayRecursionDepth = 0;
 
-    VkPhysicalDeviceProperties2 devProps;
+	VkPhysicalDeviceProperties2 devProps{};
     devProps.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
     devProps.pNext = &rtProps;
     devProps.properties = {};
 
     vkGetPhysicalDeviceProperties2( gRenderer.physicalDevice, &devProps );
-    
+ 
     constexpr unsigned TextureCount = 1;
     VkDescriptorSetLayoutBinding layoutBindingImage = {};
     layoutBindingImage.binding = 0;
@@ -1069,7 +1078,7 @@ static void CreateOutputImage()
 
 	VK_CHECK( vkBeginCommandBuffer( gRenderer.swapchainResources[ gRenderer.currentBuffer ].drawCommandBuffer, &cmdBufInfo ) );
 
-	SetImageLayout( gRenderer.swapchainResources[ gRenderer.currentBuffer ].drawCommandBuffer, gRenderer.outputImage, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, 1, 0, 1, VK_PIPELINE_STAGE_TRANSFER_BIT );
+	SetImageLayout( gRenderer.swapchainResources[ gRenderer.currentBuffer ].drawCommandBuffer, gRenderer.outputImage, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, 1, 0, 1, VK_PIPELINE_STAGE_TRANSFER_BIT );
 
 	VK_CHECK( vkEndCommandBuffer( gRenderer.swapchainResources[ 0 ].drawCommandBuffer ) );
 
@@ -1124,6 +1133,7 @@ void aeCreateRenderer( unsigned& width, unsigned& height, xcb_connection_t* conn
     CreateInstance();
     CreateDevice();
     LoadFunctionPointers();
+
     CreateCommandBuffers();
 #ifdef _MSC_VER
     CreateSwapchain( width, height, 1, hwnd );
@@ -1196,6 +1206,8 @@ void TraceRays()
 
 	SetImageLayout( gRenderer.swapchainResources[ gRenderer.currentBuffer ].drawCommandBuffer, gRenderer.swapchainResources[ gRenderer.currentBuffer].image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, 0, 1, VK_PIPELINE_STAGE_TRANSFER_BIT );
 
+	SetImageLayout( gRenderer.swapchainResources[ gRenderer.currentBuffer ].drawCommandBuffer, gRenderer.outputImage, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, 1, 0, 1, VK_PIPELINE_STAGE_TRANSFER_BIT );
+
 	VkImageCopy copy_region = {};
 	copy_region.srcSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
 	copy_region.srcOffset = { 0, 0, 0 };
@@ -1206,6 +1218,7 @@ void TraceRays()
 			gRenderer.swapchainResources[ gRenderer.currentBuffer ].image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy_region );
 
 	SetImageLayout( gRenderer.swapchainResources[ gRenderer.currentBuffer ].drawCommandBuffer, gRenderer.swapchainResources[ gRenderer.currentBuffer ].image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, 1, 0, 1, VK_PIPELINE_STAGE_TRANSFER_BIT );
+	SetImageLayout( gRenderer.swapchainResources[ gRenderer.currentBuffer ].drawCommandBuffer, gRenderer.outputImage, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, 1, 0, 1, VK_PIPELINE_STAGE_TRANSFER_BIT );
 }
 
 void aeEndFrame()
