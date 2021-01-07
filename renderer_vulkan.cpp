@@ -61,6 +61,7 @@ struct Renderer
     VkPhysicalDeviceFeatures features = {};
     VkFormat colorFormat = VK_FORMAT_UNDEFINED;
     VkPhysicalDeviceMemoryProperties deviceMemoryProperties;
+	VkPhysicalDeviceRayTracingPipelinePropertiesKHR rtProps = {};
     VkDebugUtilsMessengerEXT dbgMessenger = VK_NULL_HANDLE;
     SwapchainResource swapchainResources[ 4 ] = {};
     VkSurfaceKHR surface = VK_NULL_HANDLE;
@@ -535,6 +536,11 @@ void CreateDevice()
 	VkPhysicalDeviceRayTracingPipelineFeaturesKHR rayFeatures = {};
 	rayFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR;
 	rayFeatures.rayTracingPipeline = VK_TRUE;
+	
+	VkPhysicalDeviceVulkan12Features feat = {};
+	feat.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+	feat.bufferDeviceAddress = VK_TRUE;
+	rayFeatures.pNext = &feat;
 
     VkDeviceCreateInfo deviceCreateInfo = {};
     deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
@@ -550,13 +556,12 @@ void CreateDevice()
     vkGetPhysicalDeviceMemoryProperties( gRenderer.physicalDevice, &gRenderer.deviceMemoryProperties );
     vkGetDeviceQueue( gRenderer.device, graphicsQueueIndex, 0, &gRenderer.graphicsQueue );
 
-	VkPhysicalDeviceRayTracingPipelinePropertiesKHR rtProps{};
-    rtProps.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR;
-    rtProps.maxRayRecursionDepth = 0;
+    gRenderer.rtProps.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR;
+	gRenderer.rtProps.maxRayRecursionDepth = 0;
 
 	VkPhysicalDeviceProperties2 devProps{};
     devProps.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
-    devProps.pNext = &rtProps;
+    devProps.pNext = &gRenderer.rtProps;
     devProps.properties = {};
 
     vkGetPhysicalDeviceProperties2( gRenderer.physicalDevice, &devProps );
@@ -578,7 +583,7 @@ void CreateDevice()
 
     VK_CHECK( vkCreateDescriptorSetLayout( gRenderer.device, &setCreateInfo, nullptr, &gRenderer.descriptorSetLayout ) );
 
-    uint32_t sbtSize = rtProps.shaderGroupHandleSize * 3;
+    uint32_t sbtSize = gRenderer.rtProps.shaderGroupHandleSize * 3;
     VkBufferCreateInfo bufferInfo = {};
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     bufferInfo.size = sbtSize;
@@ -1096,7 +1101,7 @@ void CreateBuffer( VkBuffer& outBuffer, VkDeviceMemory& outMemory, unsigned size
     VkBufferCreateInfo bufferInfo = {};
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     bufferInfo.size = size;
-    bufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+    bufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
     VK_CHECK( vkCreateBuffer( gRenderer.device, &bufferInfo, nullptr, &outBuffer ) );
     SetObjectName( gRenderer.device, (uint64_t)outBuffer, VK_OBJECT_TYPE_BUFFER, debugName );
 
@@ -1106,22 +1111,45 @@ void CreateBuffer( VkBuffer& outBuffer, VkDeviceMemory& outMemory, unsigned size
     VkMemoryAllocateInfo memAlloc = {};
     memAlloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     memAlloc.allocationSize = memReqs.size;
-    memAlloc.memoryTypeIndex = GetMemoryType( memReqs.memoryTypeBits, gRenderer.deviceMemoryProperties, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
+    memAlloc.memoryTypeIndex = GetMemoryType( memReqs.memoryTypeBits, gRenderer.deviceMemoryProperties, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT_KHR );
     VK_CHECK( vkAllocateMemory( gRenderer.device, &memAlloc, nullptr, &outMemory ) );
     SetObjectName( gRenderer.device, (uint64_t)outMemory, VK_OBJECT_TYPE_DEVICE_MEMORY, debugName );
 
     VK_CHECK( vkBindBufferMemory( gRenderer.device, outBuffer, outMemory, 0 ) );
 
 }
+
+uint64_t GetBufferDeviceAddress( VkBuffer buffer )
+{
+	VkBufferDeviceAddressInfoKHR buffer_device_address_info{};
+	buffer_device_address_info.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
+	buffer_device_address_info.buffer = buffer;
+	return vkGetBufferDeviceAddress( gRenderer.device, &buffer_device_address_info );
+}
+
+uint32_t AlignedSize( uint32_t value, uint32_t alignment )
+{
+	return ( value + alignment - 1 ) & ~( alignment - 1 );
+}
+
 void CreateRaytracerResources()
 {
     unsigned numberOfGroups = 666; // FIXME: Fill this
     unsigned sizeOfGroup = 32; // FIXME: Fill this
     
+	const uint32_t handleSizeAligned = AlignedSize( gRenderer.rtProps.shaderGroupHandleSize, gRenderer.rtProps.shaderGroupHandleAlignment );
+
     CreateBuffer( gRenderer.raytracer.rayGenBindingBuffer, gRenderer.raytracer.rayGenBindingMemory, numberOfGroups * sizeOfGroup, "rayGenBindingTable" );
+	gRenderer.raytracer.rayGenBindingTable.deviceAddress = GetBufferDeviceAddress( gRenderer.raytracer.rayGenBindingBuffer );
+
     CreateBuffer( gRenderer.raytracer.rayMissBindingBuffer, gRenderer.raytracer.rayMissBindingMemory, numberOfGroups * sizeOfGroup, "rayMissBindingTable" );
+	gRenderer.raytracer.rayMissBindingTable.deviceAddress = GetBufferDeviceAddress( gRenderer.raytracer.rayMissBindingBuffer );
+
     CreateBuffer( gRenderer.raytracer.rayHitBindingBuffer, gRenderer.raytracer.rayHitBindingMemory, numberOfGroups * sizeOfGroup, "rayHitBindingTable" );
+	gRenderer.raytracer.rayHitBindingTable.deviceAddress = GetBufferDeviceAddress( gRenderer.raytracer.rayHitBindingBuffer );
+
     CreateBuffer( gRenderer.raytracer.rayCallableBindingBuffer, gRenderer.raytracer.rayCallableBindingMemory, numberOfGroups * sizeOfGroup, "rayCallableBindingTable" );
+	gRenderer.raytracer.rayCallableBindingTable.deviceAddress = GetBufferDeviceAddress( gRenderer.raytracer.rayCallableBindingBuffer );
 }
 
 #ifdef _MSC_VER
