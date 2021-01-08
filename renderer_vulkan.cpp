@@ -1108,10 +1108,15 @@ void CreateBuffer( VkBuffer& outBuffer, VkDeviceMemory& outMemory, unsigned size
     VkMemoryRequirements memReqs;
     vkGetBufferMemoryRequirements( gRenderer.device, outBuffer, &memReqs );
     
+	VkMemoryAllocateFlagsInfo memoryAllocateFlagsInfo = {};
+	memoryAllocateFlagsInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO;
+	memoryAllocateFlagsInfo.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT_KHR;
+
     VkMemoryAllocateInfo memAlloc = {};
     memAlloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	memAlloc.pNext = &memoryAllocateFlagsInfo;
     memAlloc.allocationSize = memReqs.size;
-    memAlloc.memoryTypeIndex = GetMemoryType( memReqs.memoryTypeBits, gRenderer.deviceMemoryProperties, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT_KHR );
+    memAlloc.memoryTypeIndex = GetMemoryType( memReqs.memoryTypeBits, gRenderer.deviceMemoryProperties, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
     VK_CHECK( vkAllocateMemory( gRenderer.device, &memAlloc, nullptr, &outMemory ) );
     SetObjectName( gRenderer.device, (uint64_t)outMemory, VK_OBJECT_TYPE_DEVICE_MEMORY, debugName );
 
@@ -1134,22 +1139,29 @@ uint32_t AlignedSize( uint32_t value, uint32_t alignment )
 
 void CreateRaytracerResources()
 {
-    unsigned numberOfGroups = 666; // FIXME: Fill this
-    unsigned sizeOfGroup = 32; // FIXME: Fill this
-    
+	// TODO: See create_shader_binding_tables in https://github.com/KhronosGroup/Vulkan-Samples/blob/master/samples/extensions/raytracing_basic/raytracing_basic.cpp
+
 	const uint32_t handleSizeAligned = AlignedSize( gRenderer.rtProps.shaderGroupHandleSize, gRenderer.rtProps.shaderGroupHandleAlignment );
 
-    CreateBuffer( gRenderer.raytracer.rayGenBindingBuffer, gRenderer.raytracer.rayGenBindingMemory, numberOfGroups * sizeOfGroup, "rayGenBindingTable" );
+    CreateBuffer( gRenderer.raytracer.rayGenBindingBuffer, gRenderer.raytracer.rayGenBindingMemory, gRenderer.rtProps.shaderGroupHandleSize, "rayGenBindingTable" );
 	gRenderer.raytracer.rayGenBindingTable.deviceAddress = GetBufferDeviceAddress( gRenderer.raytracer.rayGenBindingBuffer );
+	gRenderer.raytracer.rayGenBindingTable.size = handleSizeAligned;
+	gRenderer.raytracer.rayGenBindingTable.stride = handleSizeAligned;
 
-    CreateBuffer( gRenderer.raytracer.rayMissBindingBuffer, gRenderer.raytracer.rayMissBindingMemory, numberOfGroups * sizeOfGroup, "rayMissBindingTable" );
+    CreateBuffer( gRenderer.raytracer.rayMissBindingBuffer, gRenderer.raytracer.rayMissBindingMemory, gRenderer.rtProps.shaderGroupHandleSize, "rayMissBindingTable" );
 	gRenderer.raytracer.rayMissBindingTable.deviceAddress = GetBufferDeviceAddress( gRenderer.raytracer.rayMissBindingBuffer );
+	gRenderer.raytracer.rayMissBindingTable.size = handleSizeAligned;
+	gRenderer.raytracer.rayMissBindingTable.stride = handleSizeAligned;
 
-    CreateBuffer( gRenderer.raytracer.rayHitBindingBuffer, gRenderer.raytracer.rayHitBindingMemory, numberOfGroups * sizeOfGroup, "rayHitBindingTable" );
+    CreateBuffer( gRenderer.raytracer.rayHitBindingBuffer, gRenderer.raytracer.rayHitBindingMemory, gRenderer.rtProps.shaderGroupHandleSize, "rayHitBindingTable" );
 	gRenderer.raytracer.rayHitBindingTable.deviceAddress = GetBufferDeviceAddress( gRenderer.raytracer.rayHitBindingBuffer );
+	gRenderer.raytracer.rayHitBindingTable.size = handleSizeAligned;
+	gRenderer.raytracer.rayHitBindingTable.stride = handleSizeAligned;
 
-    CreateBuffer( gRenderer.raytracer.rayCallableBindingBuffer, gRenderer.raytracer.rayCallableBindingMemory, numberOfGroups * sizeOfGroup, "rayCallableBindingTable" );
+    CreateBuffer( gRenderer.raytracer.rayCallableBindingBuffer, gRenderer.raytracer.rayCallableBindingMemory, gRenderer.rtProps.shaderGroupHandleSize, "rayCallableBindingTable" );
 	gRenderer.raytracer.rayCallableBindingTable.deviceAddress = GetBufferDeviceAddress( gRenderer.raytracer.rayCallableBindingBuffer );
+	gRenderer.raytracer.rayCallableBindingTable.size = handleSizeAligned;
+	gRenderer.raytracer.rayCallableBindingTable.stride = handleSizeAligned;
 }
 
 #ifdef _MSC_VER
