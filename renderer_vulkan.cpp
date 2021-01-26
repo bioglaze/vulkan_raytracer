@@ -44,8 +44,8 @@ struct Raytracer
 
 struct ShaderBindingTable
 {
-	const unsigned groupCount = 1;
-	VkRayTracingShaderGroupCreateInfoKHR groups[ 1 ] = {};
+	const unsigned groupCount = 3;
+	VkRayTracingShaderGroupCreateInfoKHR groups[ 3 ] = {};
     VkBuffer buffer = VK_NULL_HANDLE;
     VkDeviceMemory memory = VK_NULL_HANDLE;
 };
@@ -77,9 +77,7 @@ struct Renderer
     VkShaderModule rayGenModule = VK_NULL_HANDLE;
     VkShaderModule rayMissModule = VK_NULL_HANDLE;
 	Raytracer raytracer;
-	VkPipeline psoRayHit = VK_NULL_HANDLE;
-	VkPipeline psoRayGen = VK_NULL_HANDLE;
-	VkPipeline psoRayMiss = VK_NULL_HANDLE;
+	VkPipeline psoRaytracing = VK_NULL_HANDLE;
 	VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
     VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
 	ShaderBindingTable sbt;
@@ -557,7 +555,7 @@ void CreateDevice()
     vkGetDeviceQueue( gRenderer.device, graphicsQueueIndex, 0, &gRenderer.graphicsQueue );
 
     gRenderer.rtProps.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR;
-	gRenderer.rtProps.maxRayRecursionDepth = 0;
+	gRenderer.rtProps.maxRayRecursionDepth = 1;
 
 	VkPhysicalDeviceProperties2 devProps{};
     devProps.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
@@ -935,7 +933,7 @@ void CreatePSO()
 	createInfo.pPushConstantRanges = &pushConstantRange;
 	VK_CHECK( vkCreatePipelineLayout( gRenderer.device, &createInfo, nullptr, &gRenderer.pipelineLayout ) );
 
-    constexpr unsigned StageCount = 1;
+    constexpr unsigned StageCount = 3;
 	VkPipelineShaderStageCreateInfo stages[ StageCount ] = {};
 
 	stages[ 0 ].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -943,15 +941,15 @@ void CreatePSO()
 	stages[ 0 ].module = gRenderer.rayGenModule;
 	stages[ 0 ].pName = "main";
 
-	/*stages[ 0 ].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    stages[ 0 ].stage = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
-    stages[ 0 ].module = gRenderer.rayHitModule;
-    stages[ 0 ].pName = "main";
+	stages[ 1 ].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	stages[ 1 ].stage = VK_SHADER_STAGE_MISS_BIT_KHR;
+	stages[ 1 ].module = gRenderer.rayMissModule;
+	stages[ 1 ].pName = "main";
 
 	stages[ 2 ].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	stages[ 2 ].stage = VK_SHADER_STAGE_MISS_BIT_KHR;
-	stages[ 2 ].module = gRenderer.rayMissModule;
-	stages[ 2 ].pName = "main";*/
+    stages[ 2 ].stage = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+    stages[ 2 ].module = gRenderer.rayHitModule;
+    stages[ 2 ].pName = "main";
 
 	gRenderer.sbt.groups[ 0 ].sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
 	gRenderer.sbt.groups[ 0 ].type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
@@ -959,6 +957,20 @@ void CreatePSO()
 	gRenderer.sbt.groups[ 0 ].closestHitShader = VK_SHADER_UNUSED_KHR;
 	gRenderer.sbt.groups[ 0 ].generalShader = 0;
 	gRenderer.sbt.groups[ 0 ].intersectionShader = VK_SHADER_UNUSED_KHR;
+
+	gRenderer.sbt.groups[ 1 ].sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
+	gRenderer.sbt.groups[ 1 ].type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
+	gRenderer.sbt.groups[ 1 ].anyHitShader = VK_SHADER_UNUSED_KHR;
+	gRenderer.sbt.groups[ 1 ].closestHitShader = VK_SHADER_UNUSED_KHR;
+	gRenderer.sbt.groups[ 1 ].generalShader = 1;
+	gRenderer.sbt.groups[ 1 ].intersectionShader = VK_SHADER_UNUSED_KHR;
+
+	gRenderer.sbt.groups[ 2 ].sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
+	gRenderer.sbt.groups[ 2 ].type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
+	gRenderer.sbt.groups[ 2 ].anyHitShader = VK_SHADER_UNUSED_KHR;
+	gRenderer.sbt.groups[ 2 ].closestHitShader = 2;
+	gRenderer.sbt.groups[ 2 ].generalShader = VK_SHADER_UNUSED_KHR;
+	gRenderer.sbt.groups[ 2 ].intersectionShader = VK_SHADER_UNUSED_KHR;
 
 	VkRayTracingPipelineCreateInfoKHR info{};
 	info.sType = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR;
@@ -973,8 +985,7 @@ void CreatePSO()
 	info.groupCount = gRenderer.sbt.groupCount;
 	info.pGroups = gRenderer.sbt.groups;
 
-//	typedef VkResult( VKAPI_PTR *PFN_vkCreateRayTracingPipelinesKHR )( VkDevice device, VkDeferredOperationKHR deferredOperation, VkPipelineCache pipelineCache, uint32_t createInfoCount, const VkRayTracingPipelineCreateInfoKHR* pCreateInfos, const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines );
-	VK_CHECK( CreateRayTracingPipelinesKHR( gRenderer.device, nullptr, VK_NULL_HANDLE, 1, &info, nullptr, &gRenderer.psoRayGen ) );
+	VK_CHECK( CreateRayTracingPipelinesKHR( gRenderer.device, nullptr, VK_NULL_HANDLE, 1, &info, nullptr, &gRenderer.psoRaytracing ) );
 }
 
 static void CreateDescriptorSet()
@@ -1230,7 +1241,7 @@ void aeBeginFrame()
 
 void TraceRays()
 {
-	vkCmdBindPipeline( gRenderer.swapchainResources[ gRenderer.currentBuffer ].drawCommandBuffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, gRenderer.psoRayGen );
+	vkCmdBindPipeline( gRenderer.swapchainResources[ gRenderer.currentBuffer ].drawCommandBuffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, gRenderer.psoRaytracing );
 	vkCmdBindDescriptorSets( gRenderer.swapchainResources[ gRenderer.currentBuffer ].drawCommandBuffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, gRenderer.pipelineLayout, 0, 1, &gRenderer.descriptorSet, 0, nullptr );
 
 	CmdTraceRaysKHR(
