@@ -6,7 +6,7 @@ constexpr int EventStackSize = 100;
 
 struct aeWindow
 {
-    HWND hwnd;
+	HWND hwnd{};
     int index{ 0 };
     unsigned window{ 0 };
     unsigned width{ 0 };
@@ -242,7 +242,6 @@ void aePumpWindowEvents( const aeWindow& window )
         TranslateMessage( &msg );
         DispatchMessage( &msg );
     }
-
 }
 
 const aeWindowEvent& aePopWindowEvent( const aeWindow& window )
