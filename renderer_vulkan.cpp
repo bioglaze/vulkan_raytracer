@@ -681,11 +681,11 @@ void CreateSwapchain( unsigned& width, unsigned& height, int presentInterval, st
 
     uint32_t formatCount = 0;
     err = getPhysicalDeviceSurfaceFormatsKHR( gRenderer.physicalDevice, gRenderer.surface, &formatCount, nullptr );
-    cassert( err == VK_SUCCESS && formatCount > 0 && formatCount < 20 && "Invalid format count" );
+    cassert( err == VK_SUCCESS && formatCount > 0 && formatCount < 30 && "Invalid format count" );
         
-    VkSurfaceFormatKHR surfFormats[ 20 ];        
+    VkSurfaceFormatKHR surfFormats[ 30 ];        
     err = getPhysicalDeviceSurfaceFormatsKHR( gRenderer.physicalDevice, gRenderer.surface, &formatCount, surfFormats );
-    cassert( err == VK_SUCCESS && formatCount < 20 && "Too many formats!" );
+    cassert( err == VK_SUCCESS && formatCount < 30 && "Too many formats!" );
     
     bool foundSRGB = false;
 
