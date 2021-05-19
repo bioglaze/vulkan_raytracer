@@ -46,8 +46,6 @@ struct ShaderBindingTable
 {
 	const unsigned groupCount = 3;
 	VkRayTracingShaderGroupCreateInfoKHR groups[ 3 ] = {};
-    VkBuffer buffer = VK_NULL_HANDLE;
-    VkDeviceMemory memory = VK_NULL_HANDLE;
 };
 
 struct Renderer
@@ -378,11 +376,11 @@ void CreateInstance()
         instanceCreateInfo.ppEnabledLayerNames = validationLayerNames;
     }
 #endif
-#if 0
+#if 1
     const VkValidationFeatureEnableEXT enables[] = { VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT, VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_RESERVE_BINDING_SLOT_EXT, VK_VALIDATION_FEATURE_ENABLE_BEST_PRACTICES_EXT };
     VkValidationFeaturesEXT features = {};
     features.sType = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT;
-    features.enabledValidationFeatureCount = 3;
+    features.enabledValidationFeatureCount = 2;
     features.pEnabledValidationFeatures = enables;
 
     instanceCreateInfo.pNext = &features;
@@ -529,7 +527,6 @@ void CreateDevice()
     enabledFeatures.fragmentStoresAndAtomics = gRenderer.features.fragmentStoresAndAtomics;
     enabledFeatures.shaderStorageImageExtendedFormats = gRenderer.features.shaderStorageImageExtendedFormats;
 	enabledFeatures.vertexPipelineStoresAndAtomics = gRenderer.features.vertexPipelineStoresAndAtomics;
-	enabledFeatures.vertexPipelineStoresAndAtomics = gRenderer.features.vertexPipelineStoresAndAtomics;
 
 	VkPhysicalDeviceRayTracingPipelineFeaturesKHR rayFeatures = {};
 	rayFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR;
@@ -580,23 +577,6 @@ void CreateDevice()
     setCreateInfo.pBindings = bindings;
 
     VK_CHECK( vkCreateDescriptorSetLayout( gRenderer.device, &setCreateInfo, nullptr, &gRenderer.descriptorSetLayout ) );
-
-    uint32_t sbtSize = gRenderer.rtProps.shaderGroupHandleSize * 3;
-    VkBufferCreateInfo bufferInfo = {};
-    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    bufferInfo.size = sbtSize;
-    bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR;
-    VK_CHECK( vkCreateBuffer( gRenderer.device, &bufferInfo, nullptr, &gRenderer.sbt.buffer ) );
-
-    VkMemoryRequirements memReqs;
-    VkMemoryAllocateInfo memAlloc = {};
-    memAlloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-
-    vkGetBufferMemoryRequirements( gRenderer.device, gRenderer.sbt.buffer, &memReqs );
-    memAlloc.allocationSize = memReqs.size;
-    memAlloc.memoryTypeIndex = GetMemoryType( memReqs.memoryTypeBits, gRenderer.deviceMemoryProperties, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
-    VK_CHECK( vkAllocateMemory( gRenderer.device, &memAlloc, nullptr, &gRenderer.sbt.memory ) );
-    VK_CHECK( vkBindBufferMemory( gRenderer.device, gRenderer.sbt.buffer, gRenderer.sbt.memory, 0 ) );
 }
 
 #ifdef _MSC_VER
@@ -1112,7 +1092,7 @@ void CreateBuffer( VkBuffer& outBuffer, VkDeviceMemory& outMemory, unsigned size
     VkBufferCreateInfo bufferInfo = {};
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     bufferInfo.size = size;
-    bufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+    bufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR;
     VK_CHECK( vkCreateBuffer( gRenderer.device, &bufferInfo, nullptr, &outBuffer ) );
     SetObjectName( gRenderer.device, (uint64_t)outBuffer, VK_OBJECT_TYPE_BUFFER, debugName );
 
