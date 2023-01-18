@@ -660,12 +660,13 @@ void CreateSwapchain( unsigned& width, unsigned& height, int presentInterval, st
     }
 
     uint32_t formatCount = 0;
+    constexpr uint32_t FormatMax = 35;
     err = getPhysicalDeviceSurfaceFormatsKHR( gRenderer.physicalDevice, gRenderer.surface, &formatCount, nullptr );
-    cassert( err == VK_SUCCESS && formatCount > 0 && formatCount < 30 && "Invalid format count" );
+    cassert( err == VK_SUCCESS && formatCount > 0 && formatCount < FormatMax && "Invalid format count" );
         
-    VkSurfaceFormatKHR surfFormats[ 30 ];        
+    VkSurfaceFormatKHR surfFormats[ FormatMax ];
     err = getPhysicalDeviceSurfaceFormatsKHR( gRenderer.physicalDevice, gRenderer.surface, &formatCount, surfFormats );
-    cassert( err == VK_SUCCESS && formatCount < 30 && "Too many formats!" );
+    cassert( err == VK_SUCCESS && formatCount < FormatMax && "Too many formats!" );
     
     bool foundSRGB = false;
 
@@ -1256,8 +1257,8 @@ void TraceRays()
 
     VK_CHECK( vkBeginCommandBuffer( gRenderer.swapchainResources[ gRenderer.currentBuffer ].drawCommandBuffer, &cmdBufInfo ) );
 
-	SetImageLayout( gRenderer.swapchainResources[ gRenderer.currentBuffer ].drawCommandBuffer, gRenderer.swapchainResources[ gRenderer.currentBuffer ].image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, 1, 0, 1, VK_PIPELINE_STAGE_TRANSFER_BIT );
-	SetImageLayout( gRenderer.swapchainResources[ gRenderer.currentBuffer ].drawCommandBuffer, gRenderer.outputImage, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, 1, 0, 1, VK_PIPELINE_STAGE_TRANSFER_BIT );
+	//SetImageLayout( gRenderer.swapchainResources[ gRenderer.currentBuffer ].drawCommandBuffer, gRenderer.swapchainResources[ gRenderer.currentBuffer ].image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, 1, 0, 1, VK_PIPELINE_STAGE_TRANSFER_BIT );
+	//SetImageLayout( gRenderer.swapchainResources[ gRenderer.currentBuffer ].drawCommandBuffer, gRenderer.outputImage, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, 1, 0, 1, VK_PIPELINE_STAGE_TRANSFER_BIT );
 }
 
 void aeEndFrame()

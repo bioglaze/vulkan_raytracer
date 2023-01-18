@@ -6,5 +6,5 @@ layout(location = 0) rayPayloadInEXT vec3 outColor;
 
 void main()
 {
-    outColor = vec3( 0.0f, 0.0f, 0.5f );
+    outColor = vec3( 0.0f, 1.0f, 0.5f );
 }
