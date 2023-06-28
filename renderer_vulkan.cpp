@@ -606,7 +606,7 @@ void CreateSwapchain( unsigned& width, unsigned& height, int presentInterval, st
 
     uint32_t queueCount;
     vkGetPhysicalDeviceQueueFamilyProperties( gRenderer.physicalDevice, &queueCount, nullptr );
-    cassert( queueCount > 0 && queueCount < 5 && "None or more queues than buffers have elements! Increase element count." );
+    cassert( queueCount > 0 && queueCount < 6 && "None or more queues than buffers have elements! Increase element count." );
 
     VkQueueFamilyProperties queueProps[ 5 ];
     vkGetPhysicalDeviceQueueFamilyProperties( gRenderer.physicalDevice, &queueCount, &queueProps[ 0 ] );
