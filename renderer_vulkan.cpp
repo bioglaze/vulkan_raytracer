@@ -964,7 +964,7 @@ void CreatePSO()
 	info.basePipelineHandle = VK_NULL_HANDLE;
 	info.basePipelineIndex = 0;
 	info.groupCount = gRenderer.sbt.groupCount;
-	info.pGroups = gRenderer.sbt.groups;
+    info.pGroups = gRenderer.sbt.groups;
 
 	VK_CHECK( CreateRayTracingPipelinesKHR( gRenderer.device, nullptr, VK_NULL_HANDLE, 1, &info, nullptr, &gRenderer.psoRaytracing ) );
 }
@@ -1213,11 +1213,11 @@ void aeBeginFrame()
 
     VK_CHECK( vkBeginCommandBuffer( gRenderer.swapchainResources[ gRenderer.currentBuffer ].drawCommandBuffer, &cmdBufInfo ) );
 
-    const VkViewport viewport = { 0, 0, (float)gRenderer.width, (float)gRenderer.height, 0.0f, 1.0f };
+    /*const VkViewport viewport = {0, 0, (float)gRenderer.width, (float)gRenderer.height, 0.0f, 1.0f};
     vkCmdSetViewport( gRenderer.swapchainResources[ gRenderer.currentBuffer ].drawCommandBuffer, 0, 1, &viewport );
 
     const VkRect2D scissor = { { 0, 0 }, { (uint32_t)gRenderer.width, (uint32_t)gRenderer.height } };
-    vkCmdSetScissor( gRenderer.swapchainResources[ gRenderer.currentBuffer ].drawCommandBuffer, 0, 1, &scissor );
+    vkCmdSetScissor( gRenderer.swapchainResources[ gRenderer.currentBuffer ].drawCommandBuffer, 0, 1, &scissor );*/
 }
 
 void TraceRays()
